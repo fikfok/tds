@@ -1,3 +1,4 @@
+import copy
 from abc import ABC, abstractmethod
 
 import pandas as pd
@@ -22,18 +23,9 @@ class Command:
     def __init__(self, df: pd.DataFrame):
         self._df = df
         self._cell_value = None
-        self._fillna_res = True
 
     @abstractmethod
     def res(self): raise NotImplementedError
-
-    @property
-    def fillna_res(self):
-        return self._fillna_res
-
-    @fillna_res.setter
-    def fillna_res(self, value: bool):
-        self._fillna_res = value
 
     @property
     def cell_value(self):
@@ -68,9 +60,17 @@ class CellPosition:
     def row(self):
         return self._row
 
+    @row.setter
+    def row(self, row: int):
+        self._row = row
+
     @property
     def col(self):
         return self._col
+
+    @col.setter
+    def col(self, col: int):
+        self._col = col
 
     def __lt__(self, other):
         return (self._row < other.row and self._col <= other.col) or \
@@ -83,26 +83,35 @@ class CellPosition:
         return self._row == other.row and self._col == other.col
 
     def __add__(self, other):
-        _col = None
-        _row = None
-        if self._col and other.col:
-            _col = self._col + other.col
-        elif self._col is None and other.col:
-            _col = other.col
-        elif self._col and other.col is None:
-            _col = self._col
+        col = self._add_two_values(first=self._col, second=other.col)
+        row = self._add_two_values(first=self._row, second=other.row)
+        return CellPosition(col=col, row=row)
 
-        if self._row and other.row:
-            _row = self._row + other.row
-        elif self._row is None and other.row:
-            _row = other.row
-        elif self._row and other.row is None:
-            _row = self._row
+    def _add_two_values(self, first: [int, None], second: [int, None]) -> int:
+        res = 0
+        # if isinstance(first, int) and isinstance(second, int):
+        #     res = first + second
+        # elif first is None and isinstance(second, int):
+        #     res = second
+        # elif isinstance(first, int) and second is None:
+        #     res = first
+        if first and second:
+            res = first + second
+        elif first is None and second:
+            res = second
+        elif first and second is None:
+            res = first
 
-        return CellPosition(col=_col, row=_row)
+        res = res if res >= 0 else 0
+        return res
 
     def __repr__(self):
         return f'CellPosition(col={self._col}, row={self._row})'
+
+
+class CellOffset(CellPosition):
+    def __repr__(self):
+        return f'CellOffset(col={self._col}, row={self._row})'
 
 
 class RowNumFinder(Command):
@@ -113,11 +122,47 @@ class RowNumFinder(Command):
         return CellPosition(row=row)
 
 
+class RowNumFinderOffset(RowNumFinder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._cell_offset = CellOffset(row=0)
+
+    @property
+    def offset(self) -> CellOffset:
+        return self._cell_offset
+
+    @offset.setter
+    def offset(self, offset: CellOffset):
+        self._cell_offset = copy.deepcopy(offset)
+
+    @property
+    def res(self) -> CellPosition:
+        return super().res + self._cell_offset
+
+
 class ColNumFinder(Command):
     @property
     def res(self) -> CellPosition:
         col = self._df[self._df.eq(self.raw_cell_value)].any(axis=0).idxmax()
         return CellPosition(col=col)
+
+
+class ColNumFinderOffset(ColNumFinder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._cell_offset = CellOffset(col=0)
+
+    @property
+    def offset(self) -> CellOffset:
+        return self._cell_offset
+
+    @offset.setter
+    def offset(self, offset: CellOffset):
+        self._cell_offset = copy.deepcopy(offset)
+
+    @property
+    def res(self) -> CellPosition:
+        return super().res + self._cell_offset
 
 
 class CellPositionFinder(Command):
@@ -130,6 +175,24 @@ class CellPositionFinder(Command):
         return row_num_finder.res + col_num_finder.res
 
 
+class CellPositionFinderOffset(CellPositionFinder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._cell_offset = CellOffset(row=0, col=0)
+
+    @property
+    def offset(self) -> CellOffset:
+        return self._cell_offset
+
+    @offset.setter
+    def offset(self, offset: CellOffset):
+        self._cell_offset = copy.deepcopy(offset)
+
+    @property
+    def res(self) -> CellPosition:
+        return super().res + self._cell_offset
+
+
 class StartEndCellsByValueFilterDF(Command):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -138,6 +201,15 @@ class StartEndCellsByValueFilterDF(Command):
         self._start_position = None
         self._end_position = None
         self.cell_pos_finder = CellPositionFinder(df=self._df)
+        self._fillna_res = True
+
+    @property
+    def fillna_res(self):
+        return self._fillna_res
+
+    @fillna_res.setter
+    def fillna_res(self, value: bool):
+        self._fillna_res = value
 
     @property
     def start_cell_value(self):
@@ -163,6 +235,49 @@ class StartEndCellsByValueFilterDF(Command):
 
         self.cell_pos_finder.cell_value = self._end_cell_value
         self._end_position = self.cell_pos_finder.res
+
+        if self._start_position <= self._end_position:
+            row_slice = slice(self._start_position.row, self._end_position.row + 1)
+            col_slice = slice(self._start_position.col, self._end_position.col + 1)
+            res_df: pd.DataFrame = self._df.iloc[row_slice, col_slice]
+            if self._fillna_res:
+                res_df.fillna(0, inplace=True)
+        return res_df
+
+
+class StartEndCellsByValueOffsetFilterDF(StartEndCellsByValueFilterDF):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._start_position_offset = CellOffset(row=0, col=0)
+        self._end_position_offset = CellOffset(row=0, col=0)
+        self.cell_pos_finder_offset = CellPositionFinderOffset(df=self._df)
+
+    @property
+    def start_position_offset(self) -> CellOffset:
+        return self._start_position_offset
+
+    @start_position_offset.setter
+    def start_position_offset(self, offset: CellOffset):
+        self._start_position_offset = copy.deepcopy(offset)
+
+    @property
+    def end_position_offset(self) -> CellOffset:
+        return self._end_position_offset
+
+    @end_position_offset.setter
+    def end_position_offset(self, offset: CellOffset):
+        self._end_position_offset = copy.deepcopy(offset)
+
+    @property
+    def res(self):
+        res_df = pd.DataFrame()
+        self.cell_pos_finder_offset.cell_value = self._start_cell_value
+        self.cell_pos_finder_offset.offset = self._start_position_offset
+        self._start_position = self.cell_pos_finder_offset.res
+
+        self.cell_pos_finder_offset.cell_value = self._end_cell_value
+        self.cell_pos_finder_offset.offset = self._end_position_offset
+        self._end_position = self.cell_pos_finder_offset.res
 
         if self._start_position <= self._end_position:
             row_slice = slice(self._start_position.row, self._end_position.row + 1)
