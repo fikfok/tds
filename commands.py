@@ -1,11 +1,12 @@
 import copy
 from abc import ABC, abstractmethod
 
+import numpy as np
 import pandas as pd
 
 
 class CellValue:
-    def __init__(self, value):
+    def __init__(self, value=None):
         self._value = value
 
     @property
@@ -27,28 +28,9 @@ class Command:
     @abstractmethod
     def res(self): raise NotImplementedError
 
-    @property
-    def cell_value(self):
-        if self._cell_value is None:
-            raise Exception('Value is None')
-        return self._cell_value
-
-    @cell_value.setter
-    def cell_value(self, cell_value: CellValue):
-        self._cell_value = cell_value
-
-    @property
-    def raw_cell_value(self):
-        """
-        Возвращает изначальное искомое значение
-        """
-        if self._cell_value is None:
-            raise Exception('Value is None')
-        return self._cell_value.value
-
     def __repr__(self):
         cls_name = self.__class__.__name__
-        return f"{cls_name}(df, '{self.raw_cell_value}')"
+        return f"{cls_name}(df)"
 
 
 class CellPosition:
@@ -60,17 +42,9 @@ class CellPosition:
     def row(self):
         return self._row
 
-    @row.setter
-    def row(self, row: int):
-        self._row = row
-
     @property
     def col(self):
         return self._col
-
-    @col.setter
-    def col(self, col: int):
-        self._col = col
 
     def __lt__(self, other):
         return (self._row < other.row and self._col <= other.col) or \
@@ -87,22 +61,19 @@ class CellPosition:
         row = self._add_two_values(first=self._row, second=other.row)
         return CellPosition(col=col, row=row)
 
-    def _add_two_values(self, first: [int, None], second: [int, None]) -> int:
-        res = 0
-        # if isinstance(first, int) and isinstance(second, int):
-        #     res = first + second
-        # elif first is None and isinstance(second, int):
-        #     res = second
-        # elif isinstance(first, int) and second is None:
-        #     res = first
-        if first and second:
+    def _add_two_values(self, first: [np.integer, int, None], second: [np.integer, int, None]) -> [int, None]:
+        res = None
+        if isinstance(first, (np.integer, int)) and isinstance(second, (np.integer, int)):
             res = first + second
-        elif first is None and second:
+        elif first is None and isinstance(second, (np.integer, int)):
             res = second
-        elif first and second is None:
+        elif isinstance(first, (np.integer, int)) and second is None:
             res = first
+        elif first is None and second is None:
+            res = None
 
-        res = res if res >= 0 else 0
+        if isinstance(res, (np.integer, int)):
+            res = res if res >= 0 else 0
         return res
 
     def __repr__(self):
@@ -115,91 +86,43 @@ class CellOffset(CellPosition):
 
 
 class RowNumFinder(Command):
-    @property
-    def res(self) -> CellPosition:
+    def res(self, cell_value: CellValue) -> CellPosition:
         # return self._df[self._df.eq(self._cell_value.value).any(axis=1)].index[0]
-        row = self._df[self._df.eq(self.raw_cell_value)].any(axis=1).idxmax()
+        row = self._df[self._df.eq(cell_value.value)].any(axis=1).idxmax()
         return CellPosition(row=row)
 
 
 class RowNumFinderOffset(RowNumFinder):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._cell_offset = CellOffset(row=0)
-
-    @property
-    def offset(self) -> CellOffset:
-        return self._cell_offset
-
-    @offset.setter
-    def offset(self, offset: CellOffset):
-        self._cell_offset = copy.deepcopy(offset)
-
-    @property
-    def res(self) -> CellPosition:
-        return super().res + self._cell_offset
+    def res(self, cell_value: CellValue, cell_offset: CellOffset) -> CellPosition:
+        return super().res(cell_value) + cell_offset
 
 
 class ColNumFinder(Command):
-    @property
-    def res(self) -> CellPosition:
-        col = self._df[self._df.eq(self.raw_cell_value)].any(axis=0).idxmax()
+    def res(self, cell_value: CellValue) -> CellPosition:
+        col = self._df[self._df.eq(cell_value.value)].any(axis=0).idxmax()
         return CellPosition(col=col)
 
 
 class ColNumFinderOffset(ColNumFinder):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._cell_offset = CellOffset(col=0)
-
-    @property
-    def offset(self) -> CellOffset:
-        return self._cell_offset
-
-    @offset.setter
-    def offset(self, offset: CellOffset):
-        self._cell_offset = copy.deepcopy(offset)
-
-    @property
-    def res(self) -> CellPosition:
-        return super().res + self._cell_offset
+    def res(self, cell_value: CellValue, cell_offset: CellOffset) -> CellPosition:
+        return super().res(cell_value) + cell_offset
 
 
 class CellPositionFinder(Command):
-    @property
-    def res(self) -> CellPosition:
+    def res(self, cell_value: CellValue) -> CellPosition:
         row_num_finder = RowNumFinder(df=self._df)
-        row_num_finder.cell_value = self._cell_value
         col_num_finder = ColNumFinder(df=self._df)
-        col_num_finder.cell_value = self._cell_value
-        return row_num_finder.res + col_num_finder.res
+        return row_num_finder.res(cell_value) + col_num_finder.res(cell_value)
 
 
 class CellPositionFinderOffset(CellPositionFinder):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._cell_offset = CellOffset(row=0, col=0)
-
-    @property
-    def offset(self) -> CellOffset:
-        return self._cell_offset
-
-    @offset.setter
-    def offset(self, offset: CellOffset):
-        self._cell_offset = copy.deepcopy(offset)
-
-    @property
-    def res(self) -> CellPosition:
-        return super().res + self._cell_offset
+    def res(self, cell_value: CellValue, cell_offset: CellOffset) -> CellPosition:
+        return super().res(cell_value) + cell_offset
 
 
 class StartEndCellsByValueFilterDF(Command):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._start_cell_value = None
-        self._end_cell_value = None
-        self._start_position = None
-        self._end_position = None
         self.cell_pos_finder = CellPositionFinder(df=self._df)
         self._fillna_res = True
 
@@ -211,34 +134,14 @@ class StartEndCellsByValueFilterDF(Command):
     def fillna_res(self, value: bool):
         self._fillna_res = value
 
-    @property
-    def start_cell_value(self):
-        return self._start_cell_value
-
-    @start_cell_value.setter
-    def start_cell_value(self, cell_value: CellValue):
-        self._start_cell_value = cell_value
-
-    @property
-    def end_cell_value(self):
-        return self._end_cell_value
-
-    @end_cell_value.setter
-    def end_cell_value(self, cell_value: CellValue):
-        self._end_cell_value = cell_value
-
-    @property
-    def res(self):
+    def res(self, start_cell_value: CellValue, end_cell_value: CellValue):
         res_df = pd.DataFrame()
-        self.cell_pos_finder.cell_value = self._start_cell_value
-        self._start_position = self.cell_pos_finder.res
+        start_position = self.cell_pos_finder.res(start_cell_value)
+        end_position = self.cell_pos_finder.res(end_cell_value)
 
-        self.cell_pos_finder.cell_value = self._end_cell_value
-        self._end_position = self.cell_pos_finder.res
-
-        if self._start_position <= self._end_position:
-            row_slice = slice(self._start_position.row, self._end_position.row + 1)
-            col_slice = slice(self._start_position.col, self._end_position.col + 1)
+        if start_position <= end_position:
+            row_slice = slice(start_position.row, end_position.row + 1)
+            col_slice = slice(start_position.col, end_position.col + 1)
             res_df: pd.DataFrame = self._df.iloc[row_slice, col_slice]
             if self._fillna_res:
                 res_df.fillna(0, inplace=True)
@@ -248,40 +151,17 @@ class StartEndCellsByValueFilterDF(Command):
 class StartEndCellsByValueOffsetFilterDF(StartEndCellsByValueFilterDF):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._start_position_offset = CellOffset(row=0, col=0)
-        self._end_position_offset = CellOffset(row=0, col=0)
         self.cell_pos_finder_offset = CellPositionFinderOffset(df=self._df)
 
-    @property
-    def start_position_offset(self) -> CellOffset:
-        return self._start_position_offset
-
-    @start_position_offset.setter
-    def start_position_offset(self, offset: CellOffset):
-        self._start_position_offset = copy.deepcopy(offset)
-
-    @property
-    def end_position_offset(self) -> CellOffset:
-        return self._end_position_offset
-
-    @end_position_offset.setter
-    def end_position_offset(self, offset: CellOffset):
-        self._end_position_offset = copy.deepcopy(offset)
-
-    @property
-    def res(self):
+    def res(self, start_cell_value: CellValue, end_cell_value: CellValue, start_pos_offset: CellOffset,
+            end_pos_offset: CellOffset):
         res_df = pd.DataFrame()
-        self.cell_pos_finder_offset.cell_value = self._start_cell_value
-        self.cell_pos_finder_offset.offset = self._start_position_offset
-        self._start_position = self.cell_pos_finder_offset.res
+        start_position = self.cell_pos_finder_offset.res(start_cell_value, start_pos_offset)
+        end_position = self.cell_pos_finder_offset.res(end_cell_value, end_pos_offset)
 
-        self.cell_pos_finder_offset.cell_value = self._end_cell_value
-        self.cell_pos_finder_offset.offset = self._end_position_offset
-        self._end_position = self.cell_pos_finder_offset.res
-
-        if self._start_position <= self._end_position:
-            row_slice = slice(self._start_position.row, self._end_position.row + 1)
-            col_slice = slice(self._start_position.col, self._end_position.col + 1)
+        if start_position <= end_position:
+            row_slice = slice(start_position.row, end_position.row + 1)
+            col_slice = slice(start_position.col, end_position.col + 1)
             res_df: pd.DataFrame = self._df.iloc[row_slice, col_slice]
             if self._fillna_res:
                 res_df.fillna(0, inplace=True)

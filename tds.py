@@ -6,14 +6,8 @@ with open('/home/fikfok/Downloads/Результат на 4ое задание.x
     df = pd.read_excel(xls, sheet_name='ПП', header=None)
 
     filter = StartEndCellsByValueFilterDF(df=df)
-    filter.start_cell_value = CellValue('SKU')
-    filter.end_cell_value = CellValue(105153489.25)
-    res_df = filter.res
+    res_df = filter.res(CellValue('SKU'), CellValue(105153489.25))
 
     filter1 = StartEndCellsByValueOffsetFilterDF(df=df)
-    filter1.start_cell_value = CellValue('SKU')
-    filter1.end_cell_value = CellValue(105153489.25)
-    filter1.start_position_offset = CellOffset(row=1, col=1)
-    filter1.end_position_offset = CellOffset(row=2, col=-1)
-    res1_df = filter1.res
+    res1_df = filter1.res(CellValue('SKU'), CellValue(6141), CellOffset(row=1, col=1), CellOffset(row=2, col=-1))
     a=1
