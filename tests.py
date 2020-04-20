@@ -2,7 +2,7 @@ import unittest
 
 import pandas as pd
 
-from commands import CellPosition, CellOffset, CellValue, RowNumFinder, ColNumFinder
+from commands import CellPosition, CellOffset, CellValue, RowNumFinder, ColNumFinder, ExcelCell
 from data import simple_data
 
 
@@ -36,3 +36,11 @@ class TestTDS(unittest.TestCase):
         cell_value = CellValue(10289)
         filter = ColNumFinder(df=self.df)
         self.assertEqual(filter.res(cell_value), CellPosition(col=7))
+
+    def test_excell_cell(self):
+        cell_name = 'A1'
+        excell_cell = ExcelCell(cell_name=cell_name)
+        self.assertEqual(excell_cell.cell_position, CellPosition(col=0, row=0))
+        cell_name = 'b2'
+        excell_cell = ExcelCell(cell_name=cell_name)
+        self.assertEqual(excell_cell.cell_position, CellPosition(col=1, row=1))

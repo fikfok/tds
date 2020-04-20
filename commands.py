@@ -1,4 +1,5 @@
 import copy
+import itertools
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -20,20 +21,10 @@ class CellValue:
         return f'CellValue({self._value})'
 
 
-class Command:
-    def __init__(self, df: pd.DataFrame):
-        self._df = df
-        self._cell_value = None
-
-    @abstractmethod
-    def res(self): raise NotImplementedError
-
-    def __repr__(self):
-        cls_name = self.__class__.__name__
-        return f"{cls_name}(df)"
-
-
 class CellPosition:
+    """
+    Zero-based позиция ячейки.
+    """
     def __init__(self, row: int = None, col: int = None):
         self._row = row
         self._col = col
@@ -85,6 +76,98 @@ class CellOffset(CellPosition):
         return f'CellOffset(col={self._col}, row={self._row})'
 
 
+class ExcelCell:
+    """
+    One-based адрес ячейки в стиле Excel: А1.
+    """
+    MAX_EXCEL_COLUMNS_COUNT = 16384
+    MAX_EXCEL_ROWS_COUNT = 1048576
+
+    _first_columns_labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    _all_columns_labels = list(_first_columns_labels)
+    _all_columns_labels += [''.join(item) for item in itertools.product(_first_columns_labels, repeat=3)]
+    ALL_COLUMNS_LABELS = _all_columns_labels[:MAX_EXCEL_COLUMNS_COUNT]
+
+    def __init__(self, cell_name: str):
+        self._cell_name = cell_name.upper()
+
+        col_alias = ''
+        row_alias = ''
+        for char in self._cell_name:
+            if char.isalpha():
+                col_alias += char
+            elif char.isdigit():
+                row_alias += char
+            else:
+                raise Exception(f'Wrong char in ExcelCellPosition: "{char}"')
+        try:
+            col = self.ALL_COLUMNS_LABELS.index(col_alias)
+        except Exception:
+            raise Exception(f'Wrong column name in ExcelCellPosition: "{col_alias}"')
+
+        try:
+            row = int(row_alias)
+        except Exception:
+            raise Exception(f'Wrong row number in ExcelCellPosition: "{col_alias}"')
+        else:
+            if row > self.MAX_EXCEL_ROWS_COUNT:
+                raise Exception(f'Wrong row number in ExcelCellPosition: "{col_alias}"')
+
+        row -= 1
+        self._cell_position = CellPosition(col=col, row=row)
+
+    @property
+    def excel_cell(self) -> str:
+        return self._cell_name
+
+    @property
+    def cell_position(self) -> CellPosition:
+        return self._cell_position
+
+    def __lt__(self, other):
+
+    def __le__(self, other):
+
+    def __eq__(self, other):
+
+    def __add__(self, other):
+        only CellOffset can be
+
+
+    def __repr__(self):
+        return f'ExcelCell(cell_name="{self._cell_name}")'
+
+
+class Command:
+    def __init__(self, df: pd.DataFrame):
+        self._df = df
+        self._cell_value = None
+        self._fillna_res = True
+
+    @property
+    def fillna_res(self):
+        return self._fillna_res
+
+    @fillna_res.setter
+    def fillna_res(self, value: bool):
+        self._fillna_res = value
+
+    @abstractmethod
+    def res(self): raise NotImplementedError
+
+    def _filter_df_by_positions(self, start_position: CellPosition, end_position: CellPosition) -> pd.DataFrame:
+        res_df = pd.DataFrame()
+        if start_position <= end_position:
+            row_slice = slice(start_position.row, end_position.row + 1)
+            col_slice = slice(start_position.col, end_position.col + 1)
+            res_df: pd.DataFrame = self._df.iloc[row_slice, col_slice]
+        return res_df
+
+    def __repr__(self):
+        cls_name = self.__class__.__name__
+        return f"{cls_name}(df)"
+
+
 class RowNumFinder(Command):
     def res(self, cell_value: CellValue) -> CellPosition:
         # return self._df[self._df.eq(self._cell_value.value).any(axis=1)].index[0]
@@ -124,45 +207,36 @@ class StartEndCellsByValueFilterDF(Command):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.cell_pos_finder = CellPositionFinder(df=self._df)
-        self._fillna_res = True
-
-    @property
-    def fillna_res(self):
-        return self._fillna_res
-
-    @fillna_res.setter
-    def fillna_res(self, value: bool):
-        self._fillna_res = value
 
     def res(self, start_cell_value: CellValue, end_cell_value: CellValue):
-        res_df = pd.DataFrame()
         start_position = self.cell_pos_finder.res(start_cell_value)
         end_position = self.cell_pos_finder.res(end_cell_value)
 
-        if start_position <= end_position:
-            row_slice = slice(start_position.row, end_position.row + 1)
-            col_slice = slice(start_position.col, end_position.col + 1)
-            res_df: pd.DataFrame = self._df.iloc[row_slice, col_slice]
-            if self._fillna_res:
-                res_df.fillna(0, inplace=True)
+        res_df = self._filter_df_by_positions(start_position, end_position)
+        if self._fillna_res:
+            res_df.fillna(0, inplace=True)
         return res_df
 
 
-class StartEndCellsByValueOffsetFilterDF(StartEndCellsByValueFilterDF):
+class StartEndCellsByValueOffsetFilterDF(Command):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.cell_pos_finder_offset = CellPositionFinderOffset(df=self._df)
 
     def res(self, start_cell_value: CellValue, end_cell_value: CellValue, start_pos_offset: CellOffset,
             end_pos_offset: CellOffset):
-        res_df = pd.DataFrame()
         start_position = self.cell_pos_finder_offset.res(start_cell_value, start_pos_offset)
         end_position = self.cell_pos_finder_offset.res(end_cell_value, end_pos_offset)
 
-        if start_position <= end_position:
-            row_slice = slice(start_position.row, end_position.row + 1)
-            col_slice = slice(start_position.col, end_position.col + 1)
-            res_df: pd.DataFrame = self._df.iloc[row_slice, col_slice]
-            if self._fillna_res:
-                res_df.fillna(0, inplace=True)
+        res_df = self._filter_df_by_positions(start_position, end_position)
+        if self._fillna_res:
+            res_df.fillna(0, inplace=True)
+        return res_df
+
+
+class ByPositionLeftTopRightBottomFilterDF(Command):
+    def res(self, start_position: CellPosition, end_position: CellPosition):
+        res_df = self._filter_df_by_positions(start_position, end_position)
+        if self._fillna_res:
+            res_df.fillna(0, inplace=True)
         return res_df
