@@ -6,6 +6,16 @@ import numpy as np
 import pandas as pd
 
 
+class ExcelConstants:
+    MAX_EXCEL_COLUMNS_COUNT = 16384
+    MAX_EXCEL_ROWS_COUNT = 1048576
+
+    _first_columns_labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    _all_columns_labels = list(_first_columns_labels)
+    _all_columns_labels += [''.join(item) for item in itertools.product(_first_columns_labels, repeat=3)]
+    ALL_COLUMNS_LABELS = _all_columns_labels[:MAX_EXCEL_COLUMNS_COUNT]
+
+
 class CellValue:
     def __init__(self, value=None):
         self._value = value
@@ -23,10 +33,15 @@ class CellValue:
 
 class CellPosition:
     """
-    Zero-based позиция ячейки.
+    Zero-based позиция ячейки. Не может хранить отрицательные значения.
     """
     def __init__(self, row: int = None, col: int = None):
+        if row and row < 0:
+            raise Exception('"row" must not be less than zero')
         self._row = row
+
+        if col and col < 0:
+            raise Exception('"col" must not be less than zero')
         self._col = col
 
     @property
@@ -36,6 +51,16 @@ class CellPosition:
     @property
     def col(self):
         return self._col
+
+    @property
+    def excel_cell(self) -> str:
+        res = ''
+        if self._col is not None and self._row is not None:
+            res = ExcelConstants.ALL_COLUMNS_LABELS[self._col] + str(self._row + 1)
+        else:
+            # TODO Продумать этот вариант
+            pass
+        return res
 
     def __lt__(self, other):
         return (self._row < other.row and self._col <= other.col) or \
@@ -72,6 +97,13 @@ class CellPosition:
 
 
 class CellOffset(CellPosition):
+    """
+    Смещение. Может хранить отрицательные значения.
+    """
+    def __init__(self, row: int = None, col: int = None):
+        self._row = row
+        self._col = col
+
     def __repr__(self):
         return f'CellOffset(col={self._col}, row={self._row})'
 
@@ -80,28 +112,39 @@ class ExcelCell:
     """
     One-based адрес ячейки в стиле Excel: А1.
     """
-    MAX_EXCEL_COLUMNS_COUNT = 16384
-    MAX_EXCEL_ROWS_COUNT = 1048576
-
-    _first_columns_labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    _all_columns_labels = list(_first_columns_labels)
-    _all_columns_labels += [''.join(item) for item in itertools.product(_first_columns_labels, repeat=3)]
-    ALL_COLUMNS_LABELS = _all_columns_labels[:MAX_EXCEL_COLUMNS_COUNT]
 
     def __init__(self, cell_name: str):
         self._cell_name = cell_name.upper()
 
         col_alias = ''
         row_alias = ''
+
+        aliases_mask = ''
+        char_type = ''
         for char in self._cell_name:
+            if char.isalpha():
+                char_type = 'c'
+            elif char.isdigit():
+                char_type = 'd'
+
+            if aliases_mask:
+                if aliases_mask[-1] != char_type:
+                    aliases_mask += char_type
+            else:
+                aliases_mask += char_type
+
             if char.isalpha():
                 col_alias += char
             elif char.isdigit():
                 row_alias += char
             else:
                 raise Exception(f'Wrong char in ExcelCellPosition: "{char}"')
+
+        if aliases_mask != 'cd':
+            raise Exception(f'Wrong excel cell name format: "{cell_name}"')
+
         try:
-            col = self.ALL_COLUMNS_LABELS.index(col_alias)
+            col = ExcelConstants.ALL_COLUMNS_LABELS.index(col_alias)
         except Exception:
             raise Exception(f'Wrong column name in ExcelCellPosition: "{col_alias}"')
 
@@ -110,7 +153,7 @@ class ExcelCell:
         except Exception:
             raise Exception(f'Wrong row number in ExcelCellPosition: "{col_alias}"')
         else:
-            if row > self.MAX_EXCEL_ROWS_COUNT:
+            if row > ExcelConstants.MAX_EXCEL_ROWS_COUNT:
                 raise Exception(f'Wrong row number in ExcelCellPosition: "{col_alias}"')
 
         row -= 1
@@ -125,14 +168,19 @@ class ExcelCell:
         return self._cell_position
 
     def __lt__(self, other):
+        return self.cell_position < other.cell_position
 
     def __le__(self, other):
+        return self.cell_position <= other.cell_position
 
     def __eq__(self, other):
+        return self.cell_position == other.cell_position
 
     def __add__(self, other):
-        only CellOffset can be
-
+        if not isinstance(other, CellOffset):
+            raise Exception('The second operand must be instance of CellOffset class')
+        new_cell_position = self.cell_position + other
+        return ExcelCell(cell_name=new_cell_position.excel_cell)
 
     def __repr__(self):
         return f'ExcelCell(cell_name="{self._cell_name}")'
