@@ -2,13 +2,14 @@ import unittest
 
 import pandas as pd
 
-from commands import CellPosition, CellOffset, CellValue, RowNumFinder, ColNumFinder, ExcelCell, ExcelConstants
+from base_types import ExcelConstants, CellValue, CellPosition, CellOffset, ExcelCell
+from position_finders import RowNumFinder, ColNumFinder, FirstCellPositionFinder
 from data import simple_data
 
 
 class TestTDS(unittest.TestCase):
     def setUp(self):
-        self.df = pd.DataFrame(data=simple_data)
+        self.df = pd.DataFrame.from_dict(data=simple_data['data'], columns=simple_data['columns'], orient='index')
 
     def test_cell_position(self):
         cells_offsets_results = [
@@ -53,14 +54,45 @@ class TestTDS(unittest.TestCase):
         self.assertRaises(Exception, CellPosition, row=-1)
 
     def test_cell_rownum_finder(self):
-        cell_value = CellValue('*АРИТЕЛ ПЛЮС ТБ П/О 2,5МГ+6,25МГ №30')
-        filter = RowNumFinder(df=self.df)
-        self.assertEqual(filter.res(cell_value), CellPosition(row=1))
+        cell_values_results = [
+            (CellValue('SKU'), CellPosition(row=0)),
+            (CellValue('*ГЛИЦИН-КАНОН ТБ ПОДЪЯЗЫЧ 1000 МГ №10'), CellPosition(row=5)),
+            (CellValue(7458), CellPosition(row=10)),
+            (CellValue(274254), CellPosition(row=15)),
+            (CellValue(234637), CellPosition(row=20)),
+            (CellValue(3012), CellPosition(row=25)),
+            (CellValue('Общий итог'), CellPosition(row=0)),
+        ]
+        position_finder = RowNumFinder(df=self.df)
+        for cell_value, result in cell_values_results:
+            self.assertEqual(position_finder.res(cell_value), result)
 
     def test_cell_colnum_finder(self):
-        cell_value = CellValue(10289)
-        filter = ColNumFinder(df=self.df)
-        self.assertEqual(filter.res(cell_value), CellPosition(col=7))
+        cell_values_results = [
+            (CellValue('SKU'), CellPosition(col=0)),
+            (CellValue(2012), CellPosition(col=1)),
+            (CellValue(2013), CellPosition(col=2)),
+            (CellValue(2014), CellPosition(col=3)),
+            (CellValue(2015), CellPosition(col=4)),
+            (CellValue(2016), CellPosition(col=5)),
+            (CellValue('Общий итог'), CellPosition(col=0)),
+        ]
+        position_finder = ColNumFinder(df=self.df)
+        for cell_value, result in cell_values_results:
+            self.assertEqual(position_finder.res(cell_value), result)
+
+    def test_cell_position_finder(self):
+        cell_values_results = [
+            (CellValue('SKU'), CellPosition(col=0, row=0)),
+            (CellValue('Общий итог'), CellPosition(col=6, row=0)),
+            (CellValue(7458), CellPosition(col=1, row=10)),
+            (CellValue(6059), CellPosition(col=5, row=16)),
+            (CellValue('ЭКСХОЛ КАПС 250 МГ №10'), CellPosition(col=0, row=197)),
+            (CellValue(105153489.25), CellPosition(col=6, row=204)),
+        ]
+        position_finder = FirstCellPositionFinder(df=self.df)
+        for cell_value, result in cell_values_results:
+            self.assertEqual(position_finder.res(cell_value), result)
 
     def test_excell_cell(self):
         self.assertEqual(ExcelCell(cell_name='A1').cell_position, CellPosition(col=0, row=0))

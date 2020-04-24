@@ -1,5 +1,5 @@
-from commands import StartEndCellsByValueFilterDF, CellValue, StartEndCellsByValueOffsetFilterDF, CellOffset, \
-    ExcelDataProvider, ByExcelCellLeftTopRightBottomFilterDF, ExcelCell
+from base_types import CellValue, CellOffset, ExcelCell, ExcelDataProvider
+from filters import ByExcelCellLeftTopRightBottomFilterDF
 
 file_path = '/home/fikfok/Downloads/Результат на 4ое задание.xlsx'
 sheet_name = 'ПП'
@@ -14,4 +14,8 @@ df = provider.get_df(sheet_name=sheet_name)
 
 filter2 = ByExcelCellLeftTopRightBottomFilterDF(df=df)
 res2_df = filter2.res(ExcelCell(cell_name='B5'), ExcelCell(cell_name='H209'))
+res2_df[2] = res2_df[2].astype(int)
+res2_df[3] = res2_df[3].astype(int)
+res2_df[4] = res2_df[4].astype(int)
+res2_df[5] = res2_df[5].astype(int)
 a=1

@@ -72,6 +72,9 @@ class CellPosition:
         return self._row == other.row and self._col == other.col
 
     def __add__(self, other):
+        # TODO Принять решение позже с чем можно складывать
+        # if not isinstance(other, CellOffset):
+        #     raise Exception('The second operand must be instance of CellOffset class')
         col = self._add_two_values(first=self._col, second=other.col)
         row = self._add_two_values(first=self._row, second=other.row)
         return CellPosition(col=col, row=row)
@@ -111,7 +114,6 @@ class ExcelCell:
     """
     One-based адрес ячейки в стиле Excel: А1.
     """
-
     def __init__(self, cell_name: str):
         self._cell_name = cell_name.upper()
 
@@ -209,58 +211,22 @@ class ExcelDataProvider(DataProviderAbstract):
 
 
 class PositionFinderAbstract(ABC):
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame = None, sr: pd.Series = None):
+        if (df is None and sr is None) or (df is not None and sr is not None):
+            raise Exception("Either the 'df' or 'sr' must be specified")
         self._df = df
+        self._sr = sr
 
     @abstractmethod
     def res(self): raise NotImplementedError
 
-    def _filter_df_by_positions(self, start_position: CellPosition, end_position: CellPosition) -> pd.DataFrame:
-        res_df = pd.DataFrame()
-        if start_position <= end_position:
-            row_slice = slice(start_position.row, end_position.row + 1)
-            col_slice = slice(start_position.col, end_position.col + 1)
-            res_df: pd.DataFrame = self._df.iloc[row_slice, col_slice]
-        return res_df
-
     def __repr__(self):
         cls_name = self.__class__.__name__
-        return f"{cls_name}(df)"
-
-
-class RowNumFinder(PositionFinderAbstract):
-    def res(self, cell_value: CellValue) -> CellPosition:
-        # return self._df[self._df.eq(self._cell_value.value).any(axis=1)].index[0]
-        row = self._df[self._df.eq(cell_value.value)].any(axis=1).idxmax()
-        return CellPosition(row=row)
-
-
-class RowNumFinderOffset(RowNumFinder):
-    def res(self, cell_value: CellValue, cell_offset: CellOffset) -> CellPosition:
-        return super().res(cell_value) + cell_offset
-
-
-class ColNumFinder(PositionFinderAbstract):
-    def res(self, cell_value: CellValue) -> CellPosition:
-        col = self._df[self._df.eq(cell_value.value)].any(axis=0).idxmax()
-        return CellPosition(col=col)
-
-
-class ColNumFinderOffset(ColNumFinder):
-    def res(self, cell_value: CellValue, cell_offset: CellOffset) -> CellPosition:
-        return super().res(cell_value) + cell_offset
-
-
-class CellPositionFinder(PositionFinderAbstract):
-    def res(self, cell_value: CellValue) -> CellPosition:
-        row_num_finder = RowNumFinder(df=self._df)
-        col_num_finder = ColNumFinder(df=self._df)
-        return row_num_finder.res(cell_value) + col_num_finder.res(cell_value)
-
-
-class CellPositionFinderOffset(CellPositionFinder):
-    def res(self, cell_value: CellValue, cell_offset: CellOffset) -> CellPosition:
-        return super().res(cell_value) + cell_offset
+        if self._df is not None:
+            msg = f"{cls_name}(df)"
+        else:
+            msg = f"{cls_name}(sr)"
+        return msg
 
 
 class FilterDfAbstract(ABC):
@@ -284,6 +250,9 @@ class FilterDfAbstract(ABC):
         df = self._filter(*args, **kwargs)
         df.reset_index(inplace=True, drop=True)
         df.columns = range(df.shape[1])
+
+        if self._fillna_res:
+            df.fillna(0, inplace=True)
         return df
 
     def _filter_df_by_positions(self, start_position: CellPosition, end_position: CellPosition) -> pd.DataFrame:
@@ -299,54 +268,3 @@ class FilterDfAbstract(ABC):
         return f"{cls_name}(df)"
 
 
-class StartEndCellsByValueFilterDF(FilterDfAbstract):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.cell_pos_finder = CellPositionFinder(df=self._df)
-
-    def _filter(self, start_cell_value: CellValue, end_cell_value: CellValue):
-        start_position = self.cell_pos_finder.res(start_cell_value)
-        end_position = self.cell_pos_finder.res(end_cell_value)
-
-        res_df = self._filter_df_by_positions(start_position, end_position)
-        if self._fillna_res:
-            res_df.fillna(0, inplace=True)
-        return res_df
-
-
-class StartEndCellsByValueOffsetFilterDF(FilterDfAbstract):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.cell_pos_finder_offset = CellPositionFinderOffset(df=self._df)
-
-    def _filter(self, start_cell_value: CellValue, end_cell_value: CellValue, start_pos_offset: CellOffset,
-            end_pos_offset: CellOffset):
-        start_position = self.cell_pos_finder_offset.res(start_cell_value, start_pos_offset)
-        end_position = self.cell_pos_finder_offset.res(end_cell_value, end_pos_offset)
-
-        res_df = self._filter_df_by_positions(start_position, end_position)
-        if self._fillna_res:
-            res_df.fillna(0, inplace=True)
-        return res_df
-
-
-class ByPositionLeftTopRightBottomFilterDF(FilterDfAbstract):
-    def _filter(self, start_position: CellPosition, end_position: CellPosition):
-        if not isinstance(start_position, CellPosition) or not isinstance(end_position, CellPosition):
-            raise Exception('The start and the end positions must be instance of CellPosition')
-
-        res_df = self._filter_df_by_positions(start_position, end_position)
-        if self._fillna_res:
-            res_df.fillna(0, inplace=True)
-        return res_df
-
-
-class ByExcelCellLeftTopRightBottomFilterDF(FilterDfAbstract):
-    def _filter(self, start_position: ExcelCell, end_position: ExcelCell):
-        if not isinstance(start_position, ExcelCell) or not isinstance(end_position, ExcelCell):
-            raise Exception('The start and the end positions must be instance of ExcelCell')
-
-        res_df = self._filter_df_by_positions(start_position.cell_position, end_position.cell_position)
-        if self._fillna_res:
-            res_df.fillna(0, inplace=True)
-        return res_df
