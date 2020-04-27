@@ -1,11 +1,16 @@
-class Point:
-    def __init__(self, x: int, y: int):
-        self._x = x
-        self._y = y
+text = """
+Мой дядя самых честных правил,
+Когда не в шутку занемог,
+Он уважать себя заставил
+И лучше выдумать не мог.
+"""
 
-    def __le__(self):
-        return True
+
+def word_gen(text):
+    splited_text = text.split(' ')
+    for word in splited_text:
+        yield word
 
 
-p1 = Point(x=1, y=1)
-p1.foo()
+for item in range(5):
+

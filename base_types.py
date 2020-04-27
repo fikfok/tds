@@ -217,6 +217,20 @@ class PositionFinderAbstract(ABC):
         self._df = df
         self._sr = sr
 
+    def _get_first_index_by_axis(self, cell_value: CellValue, axis: int) -> int:
+        if self._df is not None:
+            index = self._df[self._df.eq(cell_value.value)].any(axis=axis).idxmax()
+        else:
+            index = self._sr.eq(cell_value.value).idxmax()
+        return index
+
+    def _get_all_indexes_by_axis(self, cell_value: CellValue, axis: int) -> np.array:
+        if self._df is not None:
+            seria = self._df[self._df.eq(cell_value.value)].any(axis=axis)
+        else:
+            seria = self._sr.eq(cell_value.value)
+        return seria[seria].index.values
+
     @abstractmethod
     def res(self): raise NotImplementedError
 
