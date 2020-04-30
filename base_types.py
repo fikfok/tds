@@ -23,6 +23,19 @@ class CellValue:
     def value(self):
         return self._value
 
+    def __eq__(self, another):
+        if isinstance(self._value, float) and isinstance(another.value, float):
+            # Т.к. в данном случае не стоит задача проверки близости двух значений друг к другу,
+            # а необходимо проверить идентичность написанного.
+            res = str(self._value) == str(another.value)
+        elif isinstance(self._value, int) and isinstance(another.value, float):
+            res = int(self._value) == int(another.value)
+        elif isinstance(self._value, float) and isinstance(another.value, int):
+            res = int(self._value) == int(another.value)
+        else:
+            res = self._value == another.value
+        return res
+
     def __str__(self):
         return self._value
 
@@ -36,11 +49,11 @@ class CellPosition:
     """
     def __init__(self, row: int = None, col: int = None):
         if row and row < 0:
-            raise Exception('"row" must not be less than zero')
+            raise Exception('The "row" must not be less than zero')
         self._row = row
 
         if col and col < 0:
-            raise Exception('"col" must not be less than zero')
+            raise Exception('The "col" must not be less than zero')
         self._col = col
 
     @property
@@ -282,3 +295,17 @@ class FilterDfAbstract(ABC):
         return f"{cls_name}(df)"
 
 
+class NeighborhoodCell:
+    def __init__(self, df: pd.DataFrame, cell_value: CellValue, cell_offset: CellOffset):
+        self._df = df
+        self._cell_value = cell_value
+        self._cell_offset = cell_offset
+
+    def is_neighborhood(self, cell: [CellPosition, ExcelCell]):
+        if not isinstance(cell, (CellPosition, ExcelCell)):
+            raise Exception('The "cell" must be instance of CellPosition or ExcelCell')
+
+        new_cell_position = cell + self._cell_offset
+        new_raw_value = self._df.iloc[new_cell_position.row, new_cell_position.col]
+        new_cell_value = CellValue(value=new_raw_value)
+        return self._cell_value == new_cell_value

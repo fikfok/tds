@@ -3,7 +3,7 @@ from itertools import zip_longest
 
 import pandas as pd
 
-from base_types import ExcelConstants, CellValue, CellPosition, CellOffset, ExcelCell
+from base_types import ExcelConstants, CellValue, CellPosition, CellOffset, ExcelCell, NeighborhoodCell
 from position_finders import FirstRowNumFinder, FirstColNumFinder, FirstCellPositionFinder, AllRowNumsFinder
 from data import simple_data, duplicates_data
 
@@ -158,3 +158,28 @@ class TestTDS(unittest.TestCase):
             else:
                 self.assertEqual(fact_result_positions, expected_result_positions)
                 self.assertEqual(fact_result_positions, cell_values_results[-1][1])
+
+    @unittest.skip
+    def test_all_col_nums_finder(self):
+        pass
+
+    def test_neighborhood(self):
+        data_set = [
+            (CellPosition(col=0, row=0), CellValue(4302), CellOffset(col=1, row=1), True),
+            (CellPosition(col=1, row=1), CellValue('SKU'), CellOffset(col=-1, row=-1), True),
+            (CellPosition(col=1, row=1), CellValue(2012), CellOffset(col=0, row=-1), True),
+            (CellPosition(col=1, row=1), CellValue(2013), CellOffset(col=1, row=-1), True),
+            (CellPosition(col=1, row=1), CellValue(5987), CellOffset(col=1, row=0), True),
+            (CellPosition(col=1, row=1), CellValue(3143), CellOffset(col=1, row=1), True),
+            (CellPosition(col=1, row=1), CellValue(1099), CellOffset(col=0, row=1), True),
+            (CellPosition(col=1, row=1), CellValue('*АРИТЕЛ ПЛЮС ТБ П/О 5МГ+6,25МГ №30'), CellOffset(col=-1, row=1),
+             True),
+            (CellPosition(col=1, row=1), CellValue('*АРИТЕЛ ПЛЮС ТБ П/О 2,5МГ+6,25МГ №30'), CellOffset(col=-1, row=0),
+             True),
+            (CellPosition(col=1, row=1), CellValue(4302), CellOffset(col=0, row=0), True),
+            (CellPosition(col=0, row=0), CellValue(1), CellOffset(col=1, row=1), False),
+        ]
+
+        for cell_position, cell_value, cell_offset, result in data_set:
+            neighborhood = NeighborhoodCell(df=self.simple_df, cell_value=cell_value, cell_offset=cell_offset)
+            self.assertEqual(neighborhood.is_neighborhood(cell_position), result)
