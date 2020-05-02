@@ -1,10 +1,12 @@
 import unittest
 from itertools import zip_longest
 
+import numpy as np
 import pandas as pd
 
 from base_types import ExcelConstants, CellValue, CellPosition, CellOffset, ExcelCell, NeighborhoodCell
-from position_finders import FirstRowNumFinder, FirstColNumFinder, FirstCellPositionFinder, AllRowNumsFinder
+from position_finders import FirstRowNumFinder, FirstColNumFinder, FirstCellPositionFinder, AllRowNumsFinder, \
+    AllCellPositionsFinder
 from data import simple_data, duplicates_data
 
 
@@ -15,7 +17,7 @@ class TestTDS(unittest.TestCase):
         self.duplicates_df = pd.DataFrame.from_dict(data=duplicates_data['data'], columns=duplicates_data['columns'],
                                                     orient='index')
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_position(self):
         cells_offsets_results = [
             (CellOffset(col=-1, row=-1), CellPosition(col=0, row=0)),
@@ -58,7 +60,7 @@ class TestTDS(unittest.TestCase):
         self.assertRaises(Exception, CellPosition, col=-1)
         self.assertRaises(Exception, CellPosition, row=-1)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_rownum_finder(self):
         cell_values_results = [
             (CellValue('SKU'), CellPosition(row=0)),
@@ -73,7 +75,7 @@ class TestTDS(unittest.TestCase):
         for cell_value, result in cell_values_results:
             self.assertEqual(position_finder.res(cell_value), result)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_colnum_finder(self):
         cell_values_results = [
             (CellValue('SKU'), CellPosition(col=0)),
@@ -88,7 +90,7 @@ class TestTDS(unittest.TestCase):
         for cell_value, result in cell_values_results:
             self.assertEqual(position_finder.res(cell_value), result)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_position_finder(self):
         cell_values_results = [
             (CellValue('SKU'), CellPosition(col=0, row=0)),
@@ -102,7 +104,7 @@ class TestTDS(unittest.TestCase):
         for cell_value, result in cell_values_results:
             self.assertEqual(position_finder.res(cell_value), result)
 
-    # @unittest.skip
+    @unittest.skip
     def test_excell_cell(self):
         self.assertEqual(ExcelCell(cell_name='A1').cell_position, CellPosition(col=0, row=0))
         excell_cell = ExcelCell(cell_name='b2')
@@ -163,6 +165,7 @@ class TestTDS(unittest.TestCase):
     def test_all_col_nums_finder(self):
         pass
 
+    @unittest.skip
     def test_neighborhood(self):
         data_set = [
             (CellPosition(col=0, row=0), CellValue(4302), CellOffset(col=1, row=1), True),
@@ -183,3 +186,101 @@ class TestTDS(unittest.TestCase):
         for cell_position, cell_value, cell_offset, result in data_set:
             neighborhood = NeighborhoodCell(df=self.simple_df, cell_value=cell_value, cell_offset=cell_offset)
             self.assertEqual(neighborhood.is_neighborhood(cell_position), result)
+
+    @unittest.skip
+    def test_cell_value(self):
+        cell_values_numbers_results = [
+            (CellValue(1), CellValue(1)),
+            (CellValue(0), CellValue(0)),
+            (CellValue(1.0), CellValue(1)),
+            (CellValue(0.1), CellValue(0.1)),
+            (CellValue(0.10), CellValue(0.1)),
+            (CellValue(0.100), CellValue(0.1)),
+            (CellValue(0.1000), CellValue(0.1)),
+            (CellValue(0.10000), CellValue(0.1)),
+            (CellValue(0.100000), CellValue(0.1)),
+            (CellValue(0.1000000), CellValue(0.1)),
+            (CellValue(0.10000000), CellValue(0.1)),
+            (CellValue(0.100000000), CellValue(0.1)),
+            (CellValue(0.1000000000), CellValue(0.1)),
+            (CellValue(0.11), CellValue(0.11)),
+            (CellValue(0.111), CellValue(0.111)),
+            (CellValue(0.1111), CellValue(0.1111)),
+            (CellValue(0.11111), CellValue(0.11111)),
+            (CellValue(0.111111), CellValue(0.111111)),
+            (CellValue(0.1111111), CellValue(0.1111111)),
+            (CellValue(0.11111111), CellValue(0.11111111)),
+            (CellValue(0.111111111), CellValue(0.111111111)),
+            (CellValue(0.1111111111), CellValue(0.1111111111)),
+            (CellValue(0.1111111111 + 0.1111111111), CellValue(0.2222222222)),
+            (CellValue(1 + 1), CellValue(2)),
+            (CellValue(1 + 0.11), CellValue(1.11)),
+            (CellValue(1 + 0.111), CellValue(1.111)),
+            (CellValue(1 + 0.1111), CellValue(1.1111)),
+            (CellValue(1 + 0.11111), CellValue(1.11111)),
+            (CellValue(1 + 0.111111), CellValue(1.111111)),
+            (CellValue(1 + 0.1111111), CellValue(1.1111111)),
+            (CellValue(1 + 0.11111111), CellValue(1.11111111)),
+            (CellValue(1 + 0.111111111), CellValue(1.111111111)),
+            (CellValue(1 + 0.1111111111), CellValue(1.1111111111)),
+            (CellValue(1 + 0.1111111111 + 0.1111111111), CellValue(1.2222222222)),
+            (CellValue(0.1 + 0.01), CellValue(0.11)),
+            (CellValue(0.11 + 0.001), CellValue(0.111)),
+            (CellValue(0.11 + 0.0011), CellValue(0.1111)),
+            (CellValue(0.1 + 0.01111), CellValue(0.11111)),
+            (CellValue(0.111 + 0.000111), CellValue(0.111111)),
+            (CellValue(1 * 1.1), CellValue(1.1)),
+            (CellValue(1.1 * 1.1), CellValue(1.2100000000000002)),
+            (CellValue(1 / 3), CellValue(0.3333333333333333)),
+            (CellValue(10.0/5.0), CellValue(2)),
+        ]
+
+        cell_values_strings_results = [
+            (CellValue('Qwerty'), CellValue('Qwerty')),
+            (CellValue('Qwerty '), CellValue('Qwerty ')),
+            (CellValue(' Qwerty '), CellValue(' Qwerty ')),
+            (CellValue(' Qwerty'), CellValue(' Qwerty')),
+            (CellValue('123'), CellValue('123')),
+            (CellValue('123A'), CellValue('123A')),
+            (CellValue('A123A'), CellValue('A123A')),
+            (CellValue('A123'), CellValue('A123')),
+            (CellValue(''), CellValue('')),
+            (CellValue('0'), CellValue('0')),
+            (CellValue(' '), CellValue(' ')),
+        ]
+
+        for cell_value, result in cell_values_numbers_results:
+            self.assertEqual(cell_value, result)
+            self.assertEqual(CellValue(cell_value.value / 3), CellValue(result.value / 3))
+            self.assertEqual(CellValue(-1 * cell_value.value), CellValue(-1 * result.value))
+            self.assertEqual(CellValue(10 * cell_value.value), CellValue(10 * result.value))
+            self.assertEqual(CellValue(-10 * cell_value.value), CellValue(-10 * result.value))
+
+        for value in np.arange(0, 2, 0.3):
+            self.assertEqual(CellValue(value), CellValue(value))
+            self.assertEqual(CellValue(value * 0.1), CellValue(value * 0.1))
+            self.assertEqual(CellValue(value / 3), CellValue(value / 3))
+            self.assertEqual(CellValue(value + 10), CellValue(value + 10))
+            self.assertEqual(CellValue(value - 999), CellValue(value - 999))
+
+        for cell_value, result in cell_values_numbers_results:
+            self.assertNotEqual(CellValue(-1 * cell_value.value + 1), CellValue(-1 * result.value))
+            self.assertNotEqual(CellValue(-1 * cell_value.value + 0.1), CellValue(-1 * result.value))
+            self.assertNotEqual(CellValue(10 * cell_value.value + 1), CellValue(10 * result.value))
+            self.assertNotEqual(CellValue(10 * cell_value.value + 1.1), CellValue(10 * result.value))
+            self.assertNotEqual(CellValue(-10 * cell_value.value + 1), CellValue(-10 * result.value))
+            self.assertNotEqual(CellValue(-10 * cell_value.value + 1.1), CellValue(-10 * result.value))
+
+        for cell_value, result in cell_values_strings_results:
+            self.assertEqual(cell_value, result)
+            self.assertEqual(CellValue('' + cell_value.value), CellValue('' + result.value))
+            self.assertEqual(CellValue('' + cell_value.value + ''), CellValue('' + result.value + ''))
+            self.assertEqual(CellValue(cell_value.value + ''), CellValue(result.value + ''))
+            self.assertEqual(CellValue(cell_value.value.replace('e', '\n')), CellValue(result.value.replace('e', '\n')))
+            self.assertEqual(CellValue(cell_value.value.replace('e', '\t')), CellValue(result.value.replace('e', '\t')))
+            self.assertEqual(CellValue(cell_value.value.replace('e', ' ')), CellValue(result.value.replace('e', ' ')))
+
+    def test_all_positions(self):
+        finder = AllCellPositionsFinder(df=self.duplicates_df)
+        positions = list(finder.res(CellValue(4302)))
+        a=1

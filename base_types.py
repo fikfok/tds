@@ -28,10 +28,6 @@ class CellValue:
             # Т.к. в данном случае не стоит задача проверки близости двух значений друг к другу,
             # а необходимо проверить идентичность написанного.
             res = str(self._value) == str(another.value)
-        elif isinstance(self._value, int) and isinstance(another.value, float):
-            res = int(self._value) == int(another.value)
-        elif isinstance(self._value, float) and isinstance(another.value, int):
-            res = int(self._value) == int(another.value)
         else:
             res = self._value == another.value
         return res

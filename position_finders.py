@@ -13,6 +13,15 @@ class AllColNumsFinder(PositionFinderAbstract):
             yield CellPosition(col=col)
 
 
+class AllCellPositionsFinder(PositionFinderAbstract):
+    def res(self, cell_value: CellValue) -> CellPosition:
+        row_num_finder = AllRowNumsFinder(df=self._df)
+        for row_position in row_num_finder.res(cell_value=cell_value):
+            col_num_finder = AllColNumsFinder(sr=self._df.iloc[row_position.row, :])
+            for col_position in col_num_finder.res(cell_value=cell_value):
+                yield row_position + col_position
+
+
 class FirstRowNumFinder(PositionFinderAbstract):
     def res(self, cell_value: CellValue) -> CellPosition:
         row = self._get_first_index_by_axis(cell_value=cell_value, axis=1)
