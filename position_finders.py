@@ -24,14 +24,34 @@ class AllCellPositionsFinder(PositionFinderAbstract):
 
 class FirstRowNumFinder(PositionFinderAbstract):
     def res(self, cell_value: CellValue) -> CellPosition:
-        row = self._get_first_index_by_axis(cell_value=cell_value, axis=1)
-        return CellPosition(row=row)
+        if self._df is not None:
+            row_num_finder = AllRowNumsFinder(df=self._df)
+        else:
+            row_num_finder = AllRowNumsFinder(sr=self._sr)
+        for row_position in row_num_finder.res(cell_value=cell_value):
+            # Была найдена первая строка
+            result = row_position
+            break
+        else:
+            # Ничего не найдено, т.е. генератор пуст
+            result = CellPosition()
+        return result
 
 
 class FirstColNumFinder(PositionFinderAbstract):
     def res(self, cell_value: CellValue) -> CellPosition:
-        col = self._get_first_index_by_axis(cell_value=cell_value, axis=0)
-        return CellPosition(col=col)
+        if self._df is not None:
+            col_num_finder = AllColNumsFinder(df=self._df)
+        else:
+            col_num_finder = AllColNumsFinder(sr=self._sr)
+        for col_position in col_num_finder.res(cell_value=cell_value):
+            # Был найден первый столбец
+            result = col_position
+            break
+        else:
+            # Ничего не найдено, т.е. генератор пуст
+            result = CellPosition()
+        return result
 
 
 class FirstCellPositionFinder(PositionFinderAbstract):

@@ -32,11 +32,8 @@ class CellValue:
             res = self._value == another.value
         return res
 
-    def __str__(self):
-        return self._value
-
     def __repr__(self):
-        return f'CellValue({self._value})'
+        return f'CellValue("{self._value}")'
 
 
 class CellPosition:
@@ -87,6 +84,9 @@ class CellPosition:
         col = self._add_two_values(first=self._col, second=other.col)
         row = self._add_two_values(first=self._row, second=other.row)
         return CellPosition(col=col, row=row)
+
+    def __bool__(self):
+        return bool(self._col) or bool(self._row)
 
     def _add_two_values(self, first: [np.integer, int, None], second: [np.integer, int, None]) -> [int, None]:
         res = None
@@ -235,7 +235,7 @@ class PositionFinderAbstract(ABC):
 
     def _get_all_indexes_by_axis(self, cell_value: CellValue, axis: int) -> np.array:
         if self._df is not None:
-            seria = self._df[self._df.eq(cell_value.value)].any(axis=axis)
+            seria = self._df[self._df.eq(cell_value.value)].notna().any(axis=axis)
         else:
             seria = self._sr.eq(cell_value.value)
         return seria[seria].index.values
