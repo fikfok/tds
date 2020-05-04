@@ -4,7 +4,7 @@ from itertools import zip_longest
 import numpy as np
 import pandas as pd
 
-from base_types import ExcelConstants, CellValue, CellPosition, CellOffset, ExcelCell, NeighborhoodCell
+from base_types import ExcelConstants, CellValue, CellPosition, CellOffset, ExcelCell, NeighborCell
 from position_finders import FirstRowNumFinder, FirstColNumFinder, FirstCellPositionFinder, AllRowNumsFinder, \
     AllCellPositionsFinder, AllColNumsFinder
 from data import simple_data, duplicates_data
@@ -238,8 +238,8 @@ class TestTDS(unittest.TestCase):
         ]
 
         for cell_position, cell_value, cell_offset, result in data_set:
-            neighborhood = NeighborhoodCell(df=self.simple_df, cell_value=cell_value, cell_offset=cell_offset)
-            self.assertEqual(neighborhood.is_neighborhood(cell_position), result)
+            neighborhood = NeighborCell(df=self.simple_df, cell_value=cell_value, cell_offset=cell_offset)
+            self.assertEqual(neighborhood.is_neighbor(cell_position), result)
 
     # @unittest.skip
     def test_cell_value(self):

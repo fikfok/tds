@@ -278,9 +278,9 @@ class FilterDfAbstract(ABC):
             df.fillna(0, inplace=True)
         return df
 
-    def _filter_df_by_positions(self, start_position: CellPosition, end_position: CellPosition) -> pd.DataFrame:
+    def _filter_df_ltrb(self, start_position: CellPosition, end_position: CellPosition) -> pd.DataFrame:
         res_df = pd.DataFrame()
-        if start_position <= end_position:
+        if start_position and end_position and start_position <= end_position:
             row_slice = slice(start_position.row, end_position.row + 1)
             col_slice = slice(start_position.col, end_position.col + 1)
             res_df: pd.DataFrame = self._df.iloc[row_slice, col_slice]
@@ -291,13 +291,13 @@ class FilterDfAbstract(ABC):
         return f"{cls_name}(df)"
 
 
-class NeighborhoodCell:
+class NeighborCell:
     def __init__(self, df: pd.DataFrame, cell_value: CellValue, cell_offset: CellOffset):
         self._df = df
         self._cell_value = cell_value
         self._cell_offset = cell_offset
 
-    def is_neighborhood(self, cell: [CellPosition, ExcelCell]):
+    def is_neighbor(self, cell: [CellPosition, ExcelCell]):
         if not isinstance(cell, (CellPosition, ExcelCell)):
             raise Exception('The "cell" must be instance of CellPosition or ExcelCell')
 
