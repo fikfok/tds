@@ -213,24 +213,68 @@ class PositionFinderAbstract(ABC):
         self._sr = sr
         self._condition_checkers = []
 
-    def add_condition_checker(self, checker: ConditionChecker):
-        self._condition_checkers.append(checker)
 
-    def check_conditions(self):
-        return all([condition_checker.check() for condition_checker in self._condition_checkers])
+        # Запихнуть в отдельный объект properties или conditions
+        self._exact_cell_value = None
+        self._neighbors_cells = []
+        self._cell_offset = None
 
-    def _get_all_indexes_by_axis(self, cell_value: CellValue, axis: int) -> np.array:
-        if self._df is not None:
-            seria = self._df[self._df.eq(cell_value.value)].notna().any(axis=axis)
-        else:
-            seria = self._sr.eq(cell_value.value)
-        return seria[seria].index.values
+        self._regex_cell_value_pattern = ''
+        self._exact_cell_values = []
+        self._is_condition_set = False
+
+    @property
+    def exact_cell_value(self):
+        return self._exact_cell_value
+
+    @exact_cell_value.setter
+    def exact_cell_value(self, value):
+        self._exact_cell_value = value
+        self._is_condition_set = True
+
+    @property
+    def neighbors_cells(self):
+        return self._neighbors_cells
+
+    @neighbors_cells.setter
+    def neighbors_cells(self, value):
+        self._neighbors_cells = value
+        self._is_condition_set = True
+
+    @property
+    def cell_offset(self):
+        return self._cell_offset
+
+    @cell_offset.setter
+    def cell_offset(self, value):
+        self._cell_offset = value
+        self._is_condition_set = True
+
+
+
+    # def add_condition_checker(self, checker: ConditionChecker):
+    #     self._condition_checkers.append(checker)
+    #
+    # def check_conditions(self):
+    #     return all([condition_checker.check() for condition_checker in self._condition_checkers])
+
+    def _get_all_indexes(self, axis: int) -> np.array:
+        # if self._exact_cell_value is None:
+        #     raise Exception('The "exact_cell_value" is not set')
+
+        if self._exact_cell_value is not None:
+            if self._df is not None:
+                seria = self._df[self._df.eq(self._exact_cell_value.value)].notna().any(axis=axis)
+            else:
+                seria = self._sr.eq(self._exact_cell_value.value)
+            result = seria[seria].index.values
+        return result
 
     @abstractmethod
     def get_position(self): raise NotImplementedError
 
-    def get_all_positions(self, cell_value: CellValue):
-        return list(self.get_position(cell_value))
+    def get_all_positions(self):
+        return list(self.get_position())
 
     def __repr__(self):
         cls_name = self.__class__.__name__

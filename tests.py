@@ -83,8 +83,9 @@ class TestTDS(unittest.TestCase):
             (CellValue(-999), CellPosition()),
         ]
         position_finder = FirstRowNumFinder(df=self.simple_df)
-        for cell_value, result in cell_values_results:
-            self.assertEqual(position_finder.get_position(cell_value), result)
+        for cell_value, result_position in cell_values_results:
+            position_finder.exact_cell_value = cell_value
+            self.assertEqual(position_finder.get_position(), result_position)
 
     # @unittest.skip
     def test_cell_colnum_finder(self):
@@ -101,8 +102,9 @@ class TestTDS(unittest.TestCase):
 
         ]
         position_finder = FirstColNumFinder(df=self.simple_df)
-        for cell_value, result in cell_values_results:
-            self.assertEqual(position_finder.get_position(cell_value), result)
+        for cell_value, result_positions in cell_values_results:
+            position_finder.exact_cell_value = cell_value
+            self.assertEqual(position_finder.get_position(), result_positions)
 
     # @unittest.skip
     def test_cell_position_finder(self):
@@ -115,8 +117,9 @@ class TestTDS(unittest.TestCase):
             (CellValue(105153489.25), CellPosition(col=6, row=204)),
         ]
         position_finder = FirstCellPositionFinder(df=self.simple_df)
-        for cell_value, result in cell_values_results:
-            self.assertEqual(position_finder.get_position(cell_value), result)
+        for cell_value, result_position in cell_values_results:
+            position_finder.exact_cell_value = cell_value
+            self.assertEqual(position_finder.get_position(), result_position)
 
     # @unittest.skip
     def test_excell_cell(self):
@@ -154,7 +157,7 @@ class TestTDS(unittest.TestCase):
 
     # @unittest.skip
     def test_all_row_nums_finder(self):
-        all_row_nums = AllRowNumsFinder(df=self.duplicates_df)
+        all_row_nums_finder = AllRowNumsFinder(df=self.duplicates_df)
         cell_values_results = [
             (
                 CellValue('*АРИТЕЛ ПЛЮС ТБ П/О 2,5МГ+6,25МГ №30'),
@@ -176,7 +179,8 @@ class TestTDS(unittest.TestCase):
             (CellValue(-999), [])
         ]
         for cell_value, expected_result_positions in cell_values_results:
-            fact_result_positions = all_row_nums.get_all_positions(cell_value)
+            all_row_nums_finder.exact_cell_value = cell_value
+            fact_result_positions = all_row_nums_finder.get_all_positions()
             if fact_result_positions:
                 zip_result = zip_longest(fact_result_positions, expected_result_positions)
                 for fact_position, expected_position in zip_result:
@@ -187,7 +191,7 @@ class TestTDS(unittest.TestCase):
 
     # @unittest.skip
     def test_all_col_nums_finder(self):
-        all_col_nums = AllColNumsFinder(df=self.duplicates_df)
+        all_col_nums_finder = AllColNumsFinder(df=self.duplicates_df)
         cell_values_results = [
             (
                 CellValue('Общий итог'),
@@ -209,7 +213,8 @@ class TestTDS(unittest.TestCase):
             (CellValue(-999), [])
         ]
         for cell_value, expected_result_positions in cell_values_results:
-            fact_result_positions = all_col_nums.get_all_positions(cell_value)
+            all_col_nums_finder.exact_cell_value = cell_value
+            fact_result_positions = all_col_nums_finder.get_all_positions()
             if fact_result_positions:
                 zip_result = zip_longest(fact_result_positions, expected_result_positions)
                 for fact_position, expected_position in zip_result:
@@ -378,7 +383,8 @@ class TestTDS(unittest.TestCase):
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_value, results in cell_values_results:
-            finder_results = finder.get_all_positions(cell_value=cell_value)
+            finder.exact_cell_value = cell_value
+            finder_results = finder.get_all_positions()
             self.assertEqual(len(results), len(finder_results))
             for index, finder_cell_position in enumerate(finder_results):
                 self.assertEqual(results[index], finder_cell_position)
