@@ -69,7 +69,6 @@ class TestTDS(unittest.TestCase):
         self.assertNotEqual(CellPosition(), CellPosition(row=1))
         self.assertNotEqual(CellPosition(), CellPosition(col=1, row=1))
 
-
     # @unittest.skip
     def test_cell_rownum_finder(self):
         cell_values_results = [
@@ -85,7 +84,7 @@ class TestTDS(unittest.TestCase):
         ]
         position_finder = FirstRowNumFinder(df=self.simple_df)
         for cell_value, result in cell_values_results:
-            self.assertEqual(position_finder.res(cell_value), result)
+            self.assertEqual(position_finder.get_position(cell_value), result)
 
     # @unittest.skip
     def test_cell_colnum_finder(self):
@@ -103,7 +102,7 @@ class TestTDS(unittest.TestCase):
         ]
         position_finder = FirstColNumFinder(df=self.simple_df)
         for cell_value, result in cell_values_results:
-            self.assertEqual(position_finder.res(cell_value), result)
+            self.assertEqual(position_finder.get_position(cell_value), result)
 
     # @unittest.skip
     def test_cell_position_finder(self):
@@ -117,7 +116,7 @@ class TestTDS(unittest.TestCase):
         ]
         position_finder = FirstCellPositionFinder(df=self.simple_df)
         for cell_value, result in cell_values_results:
-            self.assertEqual(position_finder.res(cell_value), result)
+            self.assertEqual(position_finder.get_position(cell_value), result)
 
     # @unittest.skip
     def test_excell_cell(self):
@@ -177,7 +176,7 @@ class TestTDS(unittest.TestCase):
             (CellValue(-999), [])
         ]
         for cell_value, expected_result_positions in cell_values_results:
-            fact_result_positions = list(all_row_nums.res(cell_value))
+            fact_result_positions = all_row_nums.get_all_positions(cell_value)
             if fact_result_positions:
                 zip_result = zip_longest(fact_result_positions, expected_result_positions)
                 for fact_position, expected_position in zip_result:
@@ -210,7 +209,7 @@ class TestTDS(unittest.TestCase):
             (CellValue(-999), [])
         ]
         for cell_value, expected_result_positions in cell_values_results:
-            fact_result_positions = list(all_col_nums.res(cell_value))
+            fact_result_positions = all_col_nums.get_all_positions(cell_value)
             if fact_result_positions:
                 zip_result = zip_longest(fact_result_positions, expected_result_positions)
                 for fact_position, expected_position in zip_result:
@@ -379,7 +378,7 @@ class TestTDS(unittest.TestCase):
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_value, results in cell_values_results:
-            finder_results = list(finder.res(cell_value=cell_value))
+            finder_results = finder.get_all_positions(cell_value=cell_value)
             self.assertEqual(len(results), len(finder_results))
             for index, finder_cell_position in enumerate(finder_results):
                 self.assertEqual(results[index], finder_cell_position)

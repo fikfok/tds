@@ -196,42 +196,28 @@ class ExcelCell:
         return f'ExcelCell(cell_name="{self._cell_name}")'
 
 
-class DataProviderAbstract(ABC):
-    """
-    Читает данные из файла и возвращает df
-    """
-    @abstractmethod
-    def __init__(self):
-        raise NotImplementedError
+class ConditionChecker:
+    def __init__(self, func, **kwargs):
+        self._func = func
+        self._kwargs = kwargs
 
-    @abstractmethod
-    def get_df(self) -> pd.DataFrame:
-        raise NotImplementedError
-
-
-class ExcelDataProvider(DataProviderAbstract):
-    def __init__(self, file_path: str):
-        self._file_path = file_path
-
-    def get_df(self, sheet_name: str) -> pd.DataFrame:
-        with open(self._file_path, 'rb') as xls:
-            self._df = pd.read_excel(xls, sheet_name=sheet_name, header=None)
-        return self._df
+    def check(self):
+        return self._func(**self._kwargs)
 
 
 class PositionFinderAbstract(ABC):
     def __init__(self, df: pd.DataFrame = None, sr: pd.Series = None):
         if (df is None and sr is None) or (df is not None and sr is not None):
-            raise Exception("Either the 'df' or 'sr' must be specified")
+            raise Exception('Either the "df" or "sr" must be specified')
         self._df = df
         self._sr = sr
+        self._condition_checkers = []
 
-    def _get_first_index_by_axis(self, cell_value: CellValue, axis: int) -> int:
-        if self._df is not None:
-            index = self._df[self._df.eq(cell_value.value)].any(axis=axis).idxmax()
-        else:
-            index = self._sr.eq(cell_value.value).idxmax()
-        return index
+    def add_condition_checker(self, checker: ConditionChecker):
+        self._condition_checkers.append(checker)
+
+    def check_conditions(self):
+        return all([condition_checker.check() for condition_checker in self._condition_checkers])
 
     def _get_all_indexes_by_axis(self, cell_value: CellValue, axis: int) -> np.array:
         if self._df is not None:
@@ -241,7 +227,10 @@ class PositionFinderAbstract(ABC):
         return seria[seria].index.values
 
     @abstractmethod
-    def res(self): raise NotImplementedError
+    def get_position(self): raise NotImplementedError
+
+    def get_all_positions(self, cell_value: CellValue):
+        return list(self.get_position(cell_value))
 
     def __repr__(self):
         cls_name = self.__class__.__name__
@@ -305,3 +294,6 @@ class NeighborCell:
         new_raw_value = self._df.iloc[new_cell_position.row, new_cell_position.col]
         new_cell_value = CellValue(value=new_raw_value)
         return self._cell_value == new_cell_value
+
+    def is_not_neighbor(self, cell: [CellPosition, ExcelCell]):
+        return not self.is_neighbor(cell=cell)

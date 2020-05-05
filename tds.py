@@ -1,4 +1,5 @@
-from base_types import CellValue, CellOffset, ExcelCell, ExcelDataProvider
+from base_types import CellValue, CellOffset, ExcelCell
+from providers import ExcelDataProvider
 from filters import ByExcelCellLTRBFilterDF
 
 file_path = '/home/fikfok/Downloads/Результат на 4ое задание.xlsx'
