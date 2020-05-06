@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 
+from finder_expression import FinderConditions
+
 
 class ExcelConstants:
     MAX_EXCEL_COLUMNS_COUNT = 16384
@@ -33,7 +35,7 @@ class CellValue:
         return res
 
     def __repr__(self):
-        return f'CellValue("{self._value}")'
+        return f'CellValue("{self._value}")' if isinstance(self._value, str) else f'CellValue({self._value})'
 
 
 class CellPosition:
@@ -211,46 +213,8 @@ class PositionFinderAbstract(ABC):
             raise Exception('Either the "df" or "sr" must be specified')
         self._df = df
         self._sr = sr
-        self._condition_checkers = []
-
-
-        # Запихнуть в отдельный объект properties или conditions
-        self._exact_cell_value = None
-        self._neighbors_cells = []
-        self._cell_offset = None
-
-        self._regex_cell_value_pattern = ''
-        self._exact_cell_values = []
-        self._is_condition_set = False
-
-    @property
-    def exact_cell_value(self):
-        return self._exact_cell_value
-
-    @exact_cell_value.setter
-    def exact_cell_value(self, value):
-        self._exact_cell_value = value
-        self._is_condition_set = True
-
-    @property
-    def neighbors_cells(self):
-        return self._neighbors_cells
-
-    @neighbors_cells.setter
-    def neighbors_cells(self, value):
-        self._neighbors_cells = value
-        self._is_condition_set = True
-
-    @property
-    def cell_offset(self):
-        return self._cell_offset
-
-    @cell_offset.setter
-    def cell_offset(self, value):
-        self._cell_offset = value
-        self._is_condition_set = True
-
-
+        self.conditions = FinderConditions()
+        # self._condition_checkers = []
 
     # def add_condition_checker(self, checker: ConditionChecker):
     #     self._condition_checkers.append(checker)
@@ -262,11 +226,21 @@ class PositionFinderAbstract(ABC):
         # if self._exact_cell_value is None:
         #     raise Exception('The "exact_cell_value" is not set')
 
-        if self._exact_cell_value is not None:
+        result = np.empty(0, dtype=np.int16)
+        conditions = self.conditions  # .get_conditions()
+        if conditions.exact_cell_value is not None:
             if self._df is not None:
-                seria = self._df[self._df.eq(self._exact_cell_value.value)].notna().any(axis=axis)
+                seria = self._df[self._df.eq(conditions.exact_cell_value.value)].notna().any(axis=axis)
             else:
-                seria = self._sr.eq(self._exact_cell_value.value)
+                seria = self._sr.eq(conditions.exact_cell_value.value)
+            result = seria[seria].index.values
+
+        elif conditions.exact_cell_values is not None:
+            values = [cell_value.value for cell_value in conditions.exact_cell_values]
+            if self._df is not None:
+                seria = self._df[self._df.isin(values)].notna().any(axis=axis)
+            else:
+                seria = self._sr.isin(values)
             result = seria[seria].index.values
         return result
 
@@ -341,3 +315,6 @@ class NeighborCell:
 
     def is_not_neighbor(self, cell: [CellPosition, ExcelCell]):
         return not self.is_neighbor(cell=cell)
+
+    def __repr__(self):
+        return f'NeighborCell(df, {self._cell_value.__repr__()}, {self._cell_offset.__repr__()})'
