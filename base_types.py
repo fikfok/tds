@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 
-from finder_expression import FinderConditions
+from finder_conditions import FinderConditions
 
 
 class ExcelConstants:
@@ -223,11 +223,9 @@ class PositionFinderAbstract(ABC):
     #     return all([condition_checker.check() for condition_checker in self._condition_checkers])
 
     def _get_all_indexes(self, axis: int) -> np.array:
-        # if self._exact_cell_value is None:
-        #     raise Exception('The "exact_cell_value" is not set')
-
         result = np.empty(0, dtype=np.int16)
-        conditions = self.conditions  # .get_conditions()
+        conditions = self.conditions
+
         if conditions.exact_cell_value is not None:
             if self._df is not None:
                 seria = self._df[self._df.eq(conditions.exact_cell_value.value)].notna().any(axis=axis)
@@ -235,12 +233,20 @@ class PositionFinderAbstract(ABC):
                 seria = self._sr.eq(conditions.exact_cell_value.value)
             result = seria[seria].index.values
 
-        elif conditions.exact_cell_values is not None:
+        elif conditions.exact_cell_values:
             values = [cell_value.value for cell_value in conditions.exact_cell_values]
             if self._df is not None:
                 seria = self._df[self._df.isin(values)].notna().any(axis=axis)
             else:
                 seria = self._sr.isin(values)
+            result = seria[seria].index.values
+
+        elif conditions.regex_cell_value_pattern is not None:
+            pattern = conditions.regex_cell_value_pattern
+            if self._df is not None:
+                seria = self._df.apply(lambda seria: seria.astype(str).str.match(pattern)).any(axis=axis)
+            else:
+                seria = self._sr.astype(str).str.match(pattern)
             result = seria[seria].index.values
         return result
 

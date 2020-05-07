@@ -5,7 +5,6 @@ class FinderConditions:
         self._exact_cell_value = None
         self._neighbors_cells = []
         self._cell_offset = None
-
         self._regex_cell_value_pattern = ''
         self._exact_cell_values = []
         self._is_condition_set = False
@@ -44,6 +43,15 @@ class FinderConditions:
     @cell_offset.setter
     def cell_offset(self, value):
         self._cell_offset = value
+        self._is_condition_set = True
+
+    @property
+    def regex_cell_value_pattern(self):
+        return self._regex_cell_value_pattern
+
+    @regex_cell_value_pattern.setter
+    def regex_cell_value_pattern(self, value):
+        self._regex_cell_value_pattern = value
         self._is_condition_set = True
 
     # def get_conditions(self):
