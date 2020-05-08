@@ -18,8 +18,14 @@ class ExcelConstants:
 
 
 class CellValue:
+    """
+    Хранит одиночное значение. Если будет передано '', то будет считаться, что это None
+    """
     def __init__(self, value=None):
-        self._value = value
+        if isinstance(value, str) and value == '':
+            self._value = None
+        else:
+            self._value = value
 
     @property
     def value(self):
@@ -33,6 +39,9 @@ class CellValue:
         else:
             res = self._value == another.value
         return res
+
+    def __bool__(self):
+        return False if self._value is None else True
 
     def __repr__(self):
         return f'CellValue("{self._value}")' if isinstance(self._value, str) else f'CellValue({self._value})'
@@ -214,27 +223,33 @@ class PositionFinderAbstract(ABC):
         self._df = df
         self._sr = sr
         self.conditions = FinderConditions()
-        # self._condition_checkers = []
-
-    # def add_condition_checker(self, checker: ConditionChecker):
-    #     self._condition_checkers.append(checker)
-    #
-    # def check_conditions(self):
-    #     return all([condition_checker.check() for condition_checker in self._condition_checkers])
 
     def _get_all_indexes(self, axis: int) -> np.array:
         result = np.empty(0, dtype=np.int16)
         conditions = self.conditions
 
         if conditions.exact_cell_value is not None:
-            if self._df is not None:
-                seria = self._df[self._df.eq(conditions.exact_cell_value.value)].notna().any(axis=axis)
+            if conditions.exact_cell_value:
+                if self._df is not None:
+                    seria = self._df[self._df.eq(conditions.exact_cell_value.value)].notna().any(axis=axis)
+                else:
+                    seria = self._sr.eq(conditions.exact_cell_value.value)
             else:
-                seria = self._sr.eq(conditions.exact_cell_value.value)
-            result = seria[seria].index.values
+                if self._df is not None:
+                    seria = self._df.isnull().any(axis=axis)
+                else:
+                    seria = self._sr.isnull()
 
+            result = seria[seria].index.values
         elif conditions.exact_cell_values:
-            values = [cell_value.value for cell_value in conditions.exact_cell_values]
+            values = set([cell_value.value for cell_value in conditions.exact_cell_values])
+
+            # TODO Здесь нужна проверка: есть ли в values None
+            # Если есть, то надо делать две проверки на двух одинаковых df'ах:
+            # 1. с isin(...), куда будут переданы реальные данные
+            # 2. и с isnull()
+            # Затем эти два два df'а складывать
+
             if self._df is not None:
                 seria = self._df[self._df.isin(values)].notna().any(axis=axis)
             else:
