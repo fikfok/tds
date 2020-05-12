@@ -169,7 +169,11 @@ class TestTDS(unittest.TestCase):
             ),
             (
                 CellValue(''),
-                [CellPosition(row=5)]
+                [CellPosition(row=5), CellPosition(row=12)]
+            ),
+            (
+                CellValue(),
+                [CellPosition(row=5), CellPosition(row=12)]
             ),
             (
                 CellValue(0),
@@ -203,7 +207,27 @@ class TestTDS(unittest.TestCase):
             ),
             (
                 CellValue(''),
-                [CellPosition(col=5)]
+                [
+                    CellPosition(col=0),
+                    CellPosition(col=1),
+                    CellPosition(col=2),
+                    CellPosition(col=3),
+                    CellPosition(col=4),
+                    CellPosition(col=5),
+                    CellPosition(col=6),
+                ]
+            ),
+            (
+                CellValue(),
+                [
+                    CellPosition(col=0),
+                    CellPosition(col=1),
+                    CellPosition(col=2),
+                    CellPosition(col=3),
+                    CellPosition(col=4),
+                    CellPosition(col=5),
+                    CellPosition(col=6),
+                ]
             ),
             (
                 CellValue(0),
@@ -233,10 +257,18 @@ class TestTDS(unittest.TestCase):
             (CellPosition(col=1, row=1), CellValue(5987), CellOffset(col=1, row=0), True),
             (CellPosition(col=1, row=1), CellValue(3143), CellOffset(col=1, row=1), True),
             (CellPosition(col=1, row=1), CellValue(1099), CellOffset(col=0, row=1), True),
-            (CellPosition(col=1, row=1), CellValue('*АРИТЕЛ ПЛЮС ТБ П/О 5МГ+6,25МГ №30'), CellOffset(col=-1, row=1),
-             True),
-            (CellPosition(col=1, row=1), CellValue('*АРИТЕЛ ПЛЮС ТБ П/О 2,5МГ+6,25МГ №30'), CellOffset(col=-1, row=0),
-             True),
+            (
+                CellPosition(col=1, row=1),
+                CellValue('*АРИТЕЛ ПЛЮС ТБ П/О 5МГ+6,25МГ №30'),
+                CellOffset(col=-1, row=1),
+                True
+            ),
+            (
+                CellPosition(col=1, row=1),
+                CellValue('*АРИТЕЛ ПЛЮС ТБ П/О 2,5МГ+6,25МГ №30'),
+                CellOffset(col=-1, row=0),
+                True
+            ),
             (CellPosition(col=1, row=1), CellValue(4302), CellOffset(col=0, row=0), True),
             (CellPosition(col=0, row=0), CellValue(1), CellOffset(col=1, row=1), False),
         ]
@@ -303,6 +335,8 @@ class TestTDS(unittest.TestCase):
             (CellValue('A123A'), CellValue('A123A')),
             (CellValue('A123'), CellValue('A123')),
             (CellValue(''), CellValue('')),
+            (CellValue(), CellValue('')),
+            (CellValue(''), CellValue()),
             (CellValue('0'), CellValue('0')),
             (CellValue(' '), CellValue(' ')),
         ]
@@ -331,12 +365,39 @@ class TestTDS(unittest.TestCase):
 
         for cell_value, result in cell_values_strings_results:
             self.assertEqual(cell_value, result)
-            self.assertEqual(CellValue('' + cell_value.value), CellValue('' + result.value))
-            self.assertEqual(CellValue('' + cell_value.value + ''), CellValue('' + result.value + ''))
-            self.assertEqual(CellValue(cell_value.value + ''), CellValue(result.value + ''))
-            self.assertEqual(CellValue(cell_value.value.replace('e', '\n')), CellValue(result.value.replace('e', '\n')))
-            self.assertEqual(CellValue(cell_value.value.replace('e', '\t')), CellValue(result.value.replace('e', '\t')))
-            self.assertEqual(CellValue(cell_value.value.replace('e', ' ')), CellValue(result.value.replace('e', ' ')))
+            str_val = str(cell_value)
+            self.assertEqual(CellValue('' + str_val), CellValue('' + str_val))
+            self.assertEqual(CellValue('' + str_val + ''), CellValue('' + str_val + ''))
+            self.assertEqual(CellValue(str_val + ''), CellValue(str_val + ''))
+            self.assertEqual(CellValue(str_val.replace('e', '\n')), CellValue(str_val.replace('e', '\n')))
+            self.assertEqual(CellValue(str_val.replace('e', '\t')), CellValue(str_val.replace('e', '\t')))
+            self.assertEqual(CellValue(str_val.replace('e', ' ')), CellValue(str_val.replace('e', ' ')))
+
+        # Проверка оператора "in"
+        cell_values = [
+            CellValue(0),
+            CellValue(0.1),
+            CellValue(-0.1),
+            CellValue(1),
+            CellValue(-1),
+            CellValue(1.1),
+            CellValue(-1.1),
+            CellValue('A'),
+            CellValue(),
+            CellValue(''),
+        ]
+        for ind in range(len(cell_values)):
+            self.assertIn(cell_values[ind], cell_values)
+        self.assertNotIn(CellValue(999), cell_values)
+        self.assertNotIn(CellValue(-999), cell_values)
+        self.assertNotIn(CellValue('Qwerty'), cell_values)
+
+        self.assertTrue(CellValue('A'))
+        self.assertTrue(CellValue(' '))
+        self.assertTrue(CellValue(1))
+
+        self.assertFalse(CellValue())
+        self.assertFalse(CellValue(''))
 
     # @unittest.skip
     def test_all_positions(self):
@@ -346,7 +407,19 @@ class TestTDS(unittest.TestCase):
             (CellValue('Общий итог'), [CellPosition(col=6, row=0), CellPosition(col=0, row=11)]),
             (CellValue(-999), []),
             (CellValue('Qwerty'), []),
-            (CellValue(''), [CellPosition(col=5, row=5)]),
+            (
+                CellValue(''),
+                [
+                    CellPosition(col=5, row=5),
+                    CellPosition(col=0, row=12),
+                    CellPosition(col=1, row=12),
+                    CellPosition(col=2, row=12),
+                    CellPosition(col=3, row=12),
+                    CellPosition(col=4, row=12),
+                    CellPosition(col=5, row=12),
+                    CellPosition(col=6, row=12)
+                ]
+            ),
             (CellValue(0), [
                 CellPosition(col=3, row=1),
                 CellPosition(col=4, row=1),

@@ -21,6 +21,9 @@ class CellValue:
     """
     Хранит одиночное значение. Если будет передано '', то будет считаться, что это None
     """
+
+    EMPTY_VALUES = {'', None}
+
     def __init__(self, value=None):
         if isinstance(value, str) and value == '':
             self._value = None
@@ -42,6 +45,9 @@ class CellValue:
 
     def __bool__(self):
         return False if self._value is None else True
+
+    def __str__(self):
+        return str(self._value) if self._value is not None else ''
 
     def __repr__(self):
         return f'CellValue("{self._value}")' if isinstance(self._value, str) else f'CellValue({self._value})'
@@ -230,30 +236,46 @@ class PositionFinderAbstract(ABC):
 
         if conditions.exact_cell_value is not None:
             if conditions.exact_cell_value:
+                # exact_cell_value не пустое значение
                 if self._df is not None:
                     seria = self._df[self._df.eq(conditions.exact_cell_value.value)].notna().any(axis=axis)
                 else:
                     seria = self._sr.eq(conditions.exact_cell_value.value)
             else:
+                # exact_cell_value пустое значение. Пустым значением могуть быть варианты: '', None, np.NaN.
+                # С None и np.NaN функция .isnull() справится, т.е. поставит True в нужную позицию.
+                # А вот с '' не справится и поставит False. Потому предварительно '' необходимо заменить на np.NaN.
                 if self._df is not None:
-                    seria = self._df.isnull().any(axis=axis)
+                    seria = self._df.replace(to_replace={'': np.NaN}).isnull().any(axis=axis)
                 else:
-                    seria = self._sr.isnull()
+                    seria = self._sr.replace(to_replace={'': np.NaN}).isnull()
 
             result = seria[seria].index.values
         elif conditions.exact_cell_values:
             values = set([cell_value.value for cell_value in conditions.exact_cell_values])
-
-            # TODO Здесь нужна проверка: есть ли в values None
-            # Если есть, то надо делать две проверки на двух одинаковых df'ах:
-            # 1. с isin(...), куда будут переданы реальные данные
-            # 2. и с isnull()
-            # Затем эти два два df'а складывать
-
-            if self._df is not None:
-                seria = self._df[self._df.isin(values)].notna().any(axis=axis)
+            empty_value_exists = len(CellValue.EMPTY_VALUES.intersection(values)) > 0
+            seria_nulls = None
+            seria_wo_nulls = None
+            if empty_value_exists:
+                # В списке есть пустое значение, значит предстоит проверка на пустое значение. Значит необходимо в
+                # '' заменить на np.NaN
+                if self._df is not None:
+                    seria_nulls = self._df.replace(to_replace={'': np.NaN}).isnull().any(axis=axis)
+                else:
+                    seria_nulls = self._sr.replace(to_replace={'': np.NaN}).isnull()
             else:
-                seria = self._sr.isin(values)
+                # В списке пустых значений нет.
+                if self._df is not None:
+                    seria_wo_nulls = self._df[self._df.isin(values)].notna().any(axis=axis)
+                else:
+                    seria_wo_nulls = self._sr.isin(values)
+
+            if seria_nulls is not None and seria_wo_nulls is not None:
+                seria = seria_nulls + seria_wo_nulls
+            elif seria_nulls is not None and seria_wo_nulls is None:
+                seria = seria_nulls
+            else:
+                seria = seria_wo_nulls
             result = seria[seria].index.values
 
         elif conditions.regex_cell_value_pattern is not None:
