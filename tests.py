@@ -17,7 +17,7 @@ class TestTDS(unittest.TestCase):
         self.duplicates_df = pd.DataFrame.from_dict(data=duplicates_data['data'], columns=duplicates_data['columns'],
                                                     orient='index')
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_position(self):
         cells_offsets_results = [
             (CellOffset(col=-1, row=-1), CellPosition(col=0, row=0)),
@@ -69,7 +69,7 @@ class TestTDS(unittest.TestCase):
         self.assertNotEqual(CellPosition(), CellPosition(row=1))
         self.assertNotEqual(CellPosition(), CellPosition(col=1, row=1))
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_rownum_finder(self):
         cell_values_results = [
             (CellValue('SKU'), CellPosition(row=0)),
@@ -87,7 +87,7 @@ class TestTDS(unittest.TestCase):
             position_finder.conditions.exact_cell_value = cell_value
             self.assertEqual(position_finder.get_position(), result_position)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_colnum_finder(self):
         cell_values_results = [
             (CellValue('SKU'), CellPosition(col=0)),
@@ -106,7 +106,7 @@ class TestTDS(unittest.TestCase):
             position_finder.conditions.exact_cell_value = cell_value
             self.assertEqual(position_finder.get_position(), result_positions)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_position_finder(self):
         cell_values_results = [
             (CellValue('SKU'), CellPosition(col=0, row=0)),
@@ -121,7 +121,7 @@ class TestTDS(unittest.TestCase):
             position_finder.conditions.exact_cell_value = cell_value
             self.assertEqual(position_finder.get_position(), result_position)
 
-    # @unittest.skip
+    @unittest.skip
     def test_excell_cell(self):
         self.assertEqual(ExcelCell(cell_name='A1').cell_position, CellPosition(col=0, row=0))
         excell_cell = ExcelCell(cell_name='b2')
@@ -155,7 +155,7 @@ class TestTDS(unittest.TestCase):
         self.assertRaises(Exception, ExcelCell, cell_name='ш1')
         self.assertRaises(Exception, ExcelCell, cell_name='a' + str(ExcelConstants.MAX_EXCEL_ROWS_COUNT + 10))
 
-    # @unittest.skip
+    @unittest.skip
     def test_all_row_nums_finder(self):
         all_row_nums_finder = AllRowNumsFinder(df=self.duplicates_df)
         cell_values_results = [
@@ -193,7 +193,7 @@ class TestTDS(unittest.TestCase):
                 self.assertEqual(fact_result_positions, expected_result_positions)
                 self.assertEqual(fact_result_positions, cell_values_results[-1][1])
 
-    # @unittest.skip
+    @unittest.skip
     def test_all_col_nums_finder(self):
         all_col_nums_finder = AllColNumsFinder(df=self.duplicates_df)
         cell_values_results = [
@@ -247,7 +247,7 @@ class TestTDS(unittest.TestCase):
                 self.assertEqual(fact_result_positions, expected_result_positions)
                 self.assertEqual(fact_result_positions, cell_values_results[-1][1])
 
-    # @unittest.skip
+    @unittest.skip
     def test_neighbor(self):
         data_set = [
             (CellPosition(col=0, row=0), CellValue(4302), CellOffset(col=1, row=1), True),
@@ -277,7 +277,7 @@ class TestTDS(unittest.TestCase):
             neighbor = NeighborCell(df=self.simple_df, cell_value=cell_value, cell_offset=cell_offset)
             self.assertEqual(neighbor.is_neighbor(cell_position), result)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_value(self):
         cell_values_numbers_results = [
             (CellValue(1), CellValue(1)),
@@ -399,7 +399,9 @@ class TestTDS(unittest.TestCase):
         self.assertFalse(CellValue())
         self.assertFalse(CellValue(''))
 
-    # @unittest.skip
+        # TODO: datetime, datetime + timezone, time, 1E+4, 1.1 != '1.1'
+
+    @unittest.skip
     def test_all_positions(self):
         cell_values_results = [
             (CellValue(4302), [CellPosition(col=1, row=1), CellPosition(col=1, row=3)]),
@@ -463,13 +465,29 @@ class TestTDS(unittest.TestCase):
             for index, finder_cell_position in enumerate(finder_results):
                 self.assertEqual(results[index], finder_cell_position)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_values_finder(self):
         cell_values_results = [
             (
                 [CellValue(3143), CellValue(2525)],
-                [CellPosition(col=2, row=2), CellPosition(col=2, row=5), CellPosition(col=2, row=7), ]
+                [CellPosition(col=2, row=2), CellPosition(col=2, row=5), CellPosition(col=2, row=7)]
             ),
+            (
+                [CellValue('Общий итог'), CellValue()],
+                [
+                    CellPosition(col=6, row=0),
+                    CellPosition(col=5, row=5),
+                    CellPosition(col=0, row=11),
+                    CellPosition(col=0, row=12),
+                    CellPosition(col=1, row=12),
+                    CellPosition(col=2, row=12),
+                    CellPosition(col=3, row=12),
+                    CellPosition(col=4, row=12),
+                    CellPosition(col=5, row=12),
+                    CellPosition(col=6, row=12),
+                ]
+            ),
+
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_values, results in cell_values_results:
@@ -487,6 +505,25 @@ class TestTDS(unittest.TestCase):
                 [NeighborCell(df=self.duplicates_df, cell_value=CellValue('Общий итог'), cell_offset=CellOffset(col=-2, row=6))],
                 [CellPosition(col=2, row=5)]
             ),
+            (
+                CellValue(0),
+                [NeighborCell(df=self.duplicates_df, cell_value=CellValue(), cell_offset=CellOffset(col=0, row=-1))],
+                [CellPosition(col=5, row=6)]
+            ),
+            (
+                CellValue('Общий итог'),
+                [NeighborCell(df=self.duplicates_df, cell_value=CellValue(), cell_offset=CellOffset(col=0, row=1))],
+                [CellPosition(col=6, row=0), CellPosition(col=0, row=11)]
+            ),
+            (
+                CellValue('Общий итог'),
+                [
+                    NeighborCell(df=self.duplicates_df, cell_value=CellValue(), cell_offset=CellOffset(col=0, row=1)),
+                    NeighborCell(df=self.duplicates_df, cell_value=CellValue(), cell_offset=CellOffset(col=1, row=1)),
+                ],
+                [CellPosition(col=0, row=11)]
+            ),
+
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_value, neighbors, results in cell_values_neighbors_results:
@@ -497,7 +534,7 @@ class TestTDS(unittest.TestCase):
             for index, finder_cell_position in enumerate(finder_results):
                 self.assertEqual(results[index], finder_cell_position)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_values_finder_with_neighbors(self):
         cell_values_neighbors_results = [
             (
@@ -515,7 +552,7 @@ class TestTDS(unittest.TestCase):
             for index, finder_cell_position in enumerate(finder_results):
                 self.assertEqual(results[index], finder_cell_position)
 
-
+    @unittest.skip
     def test_regex_cell_value_pattern(self):
         patterns_results = [
             (

@@ -39,6 +39,8 @@ class CellValue:
             # Т.к. в данном случае не стоит задача проверки близости двух значений друг к другу,
             # а необходимо проверить идентичность написанного.
             res = str(self._value) == str(another.value)
+        elif pd.isnull(self._value) and pd.isnull(another.value):
+            res = True
         else:
             res = self._value == another.value
         return res
@@ -253,22 +255,27 @@ class PositionFinderAbstract(ABC):
             result = seria[seria].index.values
         elif conditions.exact_cell_values:
             values = set([cell_value.value for cell_value in conditions.exact_cell_values])
+
+            # Применить pd.isnull([None, 1, np.NaN, '']) и подумать что бы убрать CellValue.EMPTY_VALUES
+
+            values_wo_nulls = values.difference(CellValue.EMPTY_VALUES)
             empty_value_exists = len(CellValue.EMPTY_VALUES.intersection(values)) > 0
             seria_nulls = None
             seria_wo_nulls = None
             if empty_value_exists:
-                # В списке есть пустое значение, значит предстоит проверка на пустое значение. Значит необходимо в
-                # '' заменить на np.NaN
+                # В списке есть пустое значение, значит предстоит проверка на пустое значение. Значит необходимо
+                # '' заменить на np.NaN в df
                 if self._df is not None:
                     seria_nulls = self._df.replace(to_replace={'': np.NaN}).isnull().any(axis=axis)
                 else:
                     seria_nulls = self._sr.replace(to_replace={'': np.NaN}).isnull()
-            else:
+
+            if len(values_wo_nulls):
                 # В списке пустых значений нет.
                 if self._df is not None:
-                    seria_wo_nulls = self._df[self._df.isin(values)].notna().any(axis=axis)
+                    seria_wo_nulls = self._df[self._df.isin(values_wo_nulls)].notna().any(axis=axis)
                 else:
-                    seria_wo_nulls = self._sr.isin(values)
+                    seria_wo_nulls = self._sr.isin(values_wo_nulls)
 
             if seria_nulls is not None and seria_wo_nulls is not None:
                 seria = seria_nulls + seria_wo_nulls
@@ -352,9 +359,13 @@ class NeighborCell:
             raise Exception('The "cell" must be instance of CellPosition or ExcelCell')
 
         new_cell_position = cell + self._cell_offset
-        new_raw_value = self._df.iloc[new_cell_position.row, new_cell_position.col]
-        new_cell_value = CellValue(value=new_raw_value)
-        return self._cell_value == new_cell_value
+        if 0 <= new_cell_position.row < len(self._df.index) and 0 <= new_cell_position.col < len(self._df.columns):
+            new_raw_value = self._df.iloc[new_cell_position.row, new_cell_position.col]
+            new_cell_value = CellValue(value=new_raw_value)
+            res = self._cell_value == new_cell_value
+        else:
+            res = False
+        return res
 
     def is_not_neighbor(self, cell: [CellPosition, ExcelCell]):
         return not self.is_neighbor(cell=cell)
