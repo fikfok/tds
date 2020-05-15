@@ -27,8 +27,7 @@ class AllCellPositionsFinder(PositionFinderAbstract):
                 # ячейки
                 if self.conditions.cell_offset:
                     position += self.conditions.cell_offset
-                    rows_cnt, col_cnt = self._df.shape
-                    if not (0 <= position.row < rows_cnt and 0 <= position.col < col_cnt):
+                    if not position.in_scope(df=self._df):
                         continue
 
                 if self.conditions.neighbors_cells:

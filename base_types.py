@@ -110,9 +110,11 @@ class CellPosition:
         elif first is None and second is None:
             res = None
 
-        # if isinstance(res, (np.integer, int)):
-        #     res = res if res >= 0 else 0
         return res
+
+    def in_scope(self, df: pd.DataFrame):
+        rows_cnt, col_cnt = df.shape
+        return 0 <= self._row < rows_cnt and 0 <= self._col < col_cnt
 
     def __repr__(self):
         return f'CellPosition(col={self._col}, row={self._row})'
