@@ -22,6 +22,15 @@ class AllCellPositionsFinder(PositionFinderAbstract):
             col_num_finder.conditions = self.conditions
             for col_position in col_num_finder.get_position():
                 position = row_position + col_position
+
+                # Здесь очень важен порядок. Сначала надо сместить положение, а только потом проверять соседа новой
+                # ячейки
+                if self.conditions.cell_offset:
+                    position += self.conditions.cell_offset
+                    rows_cnt, col_cnt = self._df.shape
+                    if not (0 <= position.row < rows_cnt and 0 <= position.col < col_cnt):
+                        continue
+
                 if self.conditions.neighbors_cells:
                     is_neighbor = all([neighbor.is_neighbor(position) for neighbor in self.conditions.neighbors_cells])
                     if is_neighbor:

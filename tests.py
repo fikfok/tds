@@ -29,9 +29,9 @@ class TestTDS(unittest.TestCase):
             (CellOffset(col=-1, row=1), CellPosition(col=0, row=2)),
             (CellOffset(col=-1, row=0), CellPosition(col=0, row=1)),
             (CellOffset(col=0, row=0), CellPosition(col=1, row=1)),
-            (CellOffset(col=-2, row=-2), CellPosition(col=0, row=0)),
-            (CellOffset(col=1, row=-2), CellPosition(col=2, row=0)),
-            (CellOffset(col=-2, row=1), CellPosition(col=0, row=2)),
+            (CellOffset(col=-2, row=-2), CellPosition(col=-1, row=-1)),
+            (CellOffset(col=1, row=-2), CellPosition(col=2, row=-1)),
+            (CellOffset(col=-2, row=1), CellPosition(col=-1, row=2)),
         ]
         for cell_offset, result_cell_position in cells_offsets_results:
             self.assertEqual(CellPosition(col=1, row=1) + cell_offset, result_cell_position)
@@ -55,10 +55,6 @@ class TestTDS(unittest.TestCase):
         ]
         for first_cell_position, second_cell_position, result_cell_position in incomplete_cells_positions_results:
             self.assertEqual(first_cell_position + second_cell_position, result_cell_position)
-
-        self.assertRaises(Exception, CellPosition, col=-1, row=-1)
-        self.assertRaises(Exception, CellPosition, col=-1)
-        self.assertRaises(Exception, CellPosition, row=-1)
 
         self.assertTrue(CellPosition(col=1))
         self.assertTrue(CellPosition(row=1))
@@ -463,9 +459,7 @@ class TestTDS(unittest.TestCase):
         for cell_value, results in cell_values_results:
             finder.conditions.exact_cell_value = cell_value
             finder_results = finder.get_all_positions()
-            self.assertEqual(len(results), len(finder_results))
-            for index, finder_cell_position in enumerate(finder_results):
-                self.assertEqual(results[index], finder_cell_position)
+            self._check_results(expected_result=results, finder_result=finder_results)
 
     # @unittest.skip
     def test_cell_values_finder(self):
@@ -496,9 +490,7 @@ class TestTDS(unittest.TestCase):
         for cell_values, results in cell_values_results:
             finder.conditions.exact_cell_values = cell_values
             finder_results = finder.get_all_positions()
-            self.assertEqual(len(results), len(finder_results))
-            for index, finder_cell_position in enumerate(finder_results):
-                self.assertEqual(results[index], finder_cell_position)
+            self._check_results(expected_result=results, finder_result=finder_results)
 
     # @unittest.skip
     def test_cell_value_finder_with_neighbors(self):
@@ -562,9 +554,7 @@ class TestTDS(unittest.TestCase):
             finder.conditions.exact_cell_value = cell_value
             finder.conditions.neighbors_cells = neighbors
             finder_results = finder.get_all_positions()
-            self.assertEqual(len(results), len(finder_results))
-            for index, finder_cell_position in enumerate(finder_results):
-                self.assertEqual(results[index], finder_cell_position)
+            self._check_results(expected_result=results, finder_result=finder_results)
 
     # @unittest.skip
     def test_cell_values_finder_with_neighbors(self):
@@ -580,9 +570,7 @@ class TestTDS(unittest.TestCase):
             finder.conditions.exact_cell_values = cell_values
             finder.conditions.neighbors_cells = neighbors
             finder_results = finder.get_all_positions()
-            self.assertEqual(len(results), len(finder_results))
-            for index, finder_cell_position in enumerate(finder_results):
-                self.assertEqual(results[index], finder_cell_position)
+            self._check_results(expected_result=results, finder_result=finder_results)
 
     # @unittest.skip
     def test_regex_cell_value_pattern(self):
@@ -600,6 +588,33 @@ class TestTDS(unittest.TestCase):
         for pattern, results in patterns_results:
             finder.conditions.regex_cell_value_pattern = pattern
             finder_results = finder.get_all_positions()
-            self.assertEqual(len(results), len(finder_results))
-            for index, finder_cell_position in enumerate(finder_results):
-                self.assertEqual(results[index], finder_cell_position)
+            self._check_results(expected_result=results, finder_result=finder_results)
+
+    def test_cell_value_finder_with_offset(self):
+        cell_values_results = [
+            (CellValue('SKU'), CellOffset(col=1, row=0), [CellPosition(col=1, row=0)]),
+            (CellValue('SKU'), CellOffset(col=-10, row=-10), []),
+            (
+                CellValue('Общий итог'),
+                CellOffset(col=0, row=1),
+                [
+                    CellPosition(col=6, row=1),
+                    CellPosition(col=0, row=12),
+                ]
+            ),
+            (CellValue('Общий итог'), CellOffset(col=0, row=2), [CellPosition(col=6, row=2)]),
+        ]
+        finder = AllCellPositionsFinder(df=self.duplicates_df)
+        for cell_value, cell_offset, results in cell_values_results:
+            finder.conditions.exact_cell_value = cell_value
+            finder.conditions.cell_offset = cell_offset
+            finder_results = finder.get_all_positions()
+            self._check_results(expected_result=results, finder_result=finder_results)
+
+    def test_cell_value_finder_with_offset_neighbors(self):
+        pass
+
+    def _check_results(self, expected_result: list, finder_result: list):
+        self.assertEqual(len(expected_result), len(finder_result))
+        for index, finder_cell_position in enumerate(finder_result):
+            self.assertEqual(expected_result[index], finder_cell_position)

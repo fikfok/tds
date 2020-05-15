@@ -57,12 +57,7 @@ class CellPosition:
     Zero-based позиция ячейки. Не может хранить отрицательные значения.
     """
     def __init__(self, row: int = None, col: int = None):
-        if row and row < 0:
-            raise Exception('The "row" must not be less than zero')
         self._row = row
-
-        if col and col < 0:
-            raise Exception('The "col" must not be less than zero')
         self._col = col
 
     @property
@@ -115,8 +110,8 @@ class CellPosition:
         elif first is None and second is None:
             res = None
 
-        if isinstance(res, (np.integer, int)):
-            res = res if res >= 0 else 0
+        # if isinstance(res, (np.integer, int)):
+        #     res = res if res >= 0 else 0
         return res
 
     def __repr__(self):
@@ -284,18 +279,13 @@ class PositionFinderAbstract(ABC):
             result = seria[seria].index.values
 
         # regex
-        elif conditions.regex_cell_value_pattern is not None:
+        elif conditions.regex_cell_value_pattern:
             pattern = conditions.regex_cell_value_pattern
             if self._df is not None:
                 seria = self._df.apply(lambda seria: seria.astype(str).str.match(pattern)).any(axis=axis)
             else:
                 seria = self._sr.astype(str).str.match(pattern)
             result = seria[seria].index.values
-
-
-        if conditions.cell_offset is not None:
-            pass
-
 
         return result
 
