@@ -611,8 +611,15 @@ class TestTDS(unittest.TestCase):
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 
-    def test_cell_value_finder_with_offset_neighbors(self):
-        pass
+    def test_regex_finder_with_offset_neighbors(self):
+        patterns_results = [
+            (
+                '^\*АРИТЕЛ.*',
+
+            )
+        ]
+
+
 
     def _check_results(self, expected_result: list, finder_result: list):
         self.assertEqual(len(expected_result), len(finder_result))

@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 
-from finder_conditions import FinderConditions
+from finder_conditions import FinderConditions, FinderConditionContainer
 
 
 class ExcelConstants:
@@ -46,7 +46,7 @@ class CellValue:
         return False if self._value is None else True
 
     def __str__(self):
-        return str(self._value) if self._value is not None else ''
+        return '' if self._value is None else str(self._value)
 
     def __repr__(self):
         return f'CellValue("{self._value}")' if isinstance(self._value, str) else f'CellValue({self._value})'
@@ -54,7 +54,7 @@ class CellValue:
 
 class CellPosition:
     """
-    Zero-based позиция ячейки. Не может хранить отрицательные значения.
+    Zero-based позиция ячейки.
     """
     def __init__(self, row: int = None, col: int = None):
         self._row = row
@@ -109,7 +109,6 @@ class CellPosition:
             res = first
         elif first is None and second is None:
             res = None
-
         return res
 
     def in_scope(self, df: pd.DataFrame):
@@ -224,72 +223,7 @@ class PositionFinderAbstract(ABC):
             raise Exception('Either the "df" or "sr" must be specified')
         self._df = df
         self._sr = sr
-        self.conditions = FinderConditions()
-
-    def _get_all_indexes(self, axis: int) -> np.array:
-        result = np.empty(0, dtype=np.int16)
-        conditions = self.conditions
-
-        # Конкретная ячейка
-        if conditions.exact_cell_value is not None:
-            if conditions.exact_cell_value:
-                # exact_cell_value не пустое значение
-                if self._df is not None:
-                    seria = self._df[self._df.eq(conditions.exact_cell_value.value)].notna().any(axis=axis)
-                else:
-                    seria = self._sr.eq(conditions.exact_cell_value.value)
-            else:
-                # exact_cell_value пустое значение.
-                # Пустым значением могуть быть варианты: '', None, np.NaN.
-                # С None и np.NaN функция .isnull() справится, т.е. поставит True в нужную позицию.
-                # А вот с '' не справится и поставит False. Потому предварительно '' необходимо заменить на None.
-                if self._df is not None:
-                    seria = self._df.replace(to_replace={'': None}).isnull().any(axis=axis)
-                else:
-                    seria = self._sr.replace(to_replace={'': None}).isnull()
-
-            result = seria[seria].index.values
-
-        # Список конкретных ячеек
-        elif conditions.exact_cell_values:
-            values = list(set([cell_value.value for cell_value in conditions.exact_cell_values]))
-            values_wo_nulls = [value for value in values if not pd.isnull(value)]
-            empty_value_exists = any(pd.isnull(values))
-            seria_nulls = None
-            seria_wo_nulls = None
-            if empty_value_exists:
-                # В списке есть пустое значение, значит предстоит проверка на пустое значение. Значит необходимо
-                # '' заменить на None в df
-                if self._df is not None:
-                    seria_nulls = self._df.replace(to_replace={'': None}).isnull().any(axis=axis)
-                else:
-                    seria_nulls = self._sr.replace(to_replace={'': None}).isnull()
-
-            if len(values_wo_nulls):
-                # В списке пустых значений нет.
-                if self._df is not None:
-                    seria_wo_nulls = self._df[self._df.isin(values_wo_nulls)].notna().any(axis=axis)
-                else:
-                    seria_wo_nulls = self._sr.isin(values_wo_nulls)
-
-            if seria_nulls is not None and seria_wo_nulls is not None:
-                seria = seria_nulls + seria_wo_nulls
-            elif seria_nulls is not None and seria_wo_nulls is None:
-                seria = seria_nulls
-            else:
-                seria = seria_wo_nulls
-            result = seria[seria].index.values
-
-        # regex
-        elif conditions.regex_cell_value_pattern:
-            pattern = conditions.regex_cell_value_pattern
-            if self._df is not None:
-                seria = self._df.apply(lambda seria: seria.astype(str).str.match(pattern)).any(axis=axis)
-            else:
-                seria = self._sr.astype(str).str.match(pattern)
-            result = seria[seria].index.values
-
-        return result
+        self.conditions = FinderConditionContainer()
 
     @abstractmethod
     def get_position(self): raise NotImplementedError
@@ -356,7 +290,7 @@ class NeighborCell:
             raise Exception('The "cell" must be instance of CellPosition or ExcelCell')
 
         new_cell_position = cell + self._cell_offset
-        if 0 <= new_cell_position.row < len(self._df.index) and 0 <= new_cell_position.col < len(self._df.columns):
+        if new_cell_position.in_scope(df=self._df):
             new_raw_value = self._df.iloc[new_cell_position.row, new_cell_position.col]
             new_cell_value = CellValue(value=new_raw_value)
             res = self._cell_value == new_cell_value

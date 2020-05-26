@@ -3,13 +3,13 @@ from base_types import PositionFinderAbstract, CellValue, CellPosition, CellOffs
 
 class AllRowNumsFinder(PositionFinderAbstract):
     def get_position(self) -> CellPosition:
-        for row in self._get_all_indexes(axis=1):
+        for row in self.conditions.cell_finder.get_all_indexes(axis=1):
             yield CellPosition(row=row)
 
 
 class AllColNumsFinder(PositionFinderAbstract):
     def get_position(self) -> CellPosition:
-        for col in self._get_all_indexes(axis=0):
+        for col in self.conditions.cell_finder.get_all_indexes(axis=0):
             yield CellPosition(col=col)
 
 
@@ -22,18 +22,13 @@ class AllCellPositionsFinder(PositionFinderAbstract):
             col_num_finder.conditions = self.conditions
             for col_position in col_num_finder.get_position():
                 position = row_position + col_position
-
-                # Здесь очень важен порядок. Сначала надо сместить положение, а только потом проверять соседа новой
-                # ячейки
-                if self.conditions.cell_offset:
-                    position += self.conditions.cell_offset
-                    if not position.in_scope(df=self._df):
-                        continue
-
-                if self.conditions.neighbors_cells:
-                    is_neighbor = all([neighbor.is_neighbor(position) for neighbor in self.conditions.neighbors_cells])
-                    if is_neighbor:
-                        yield position
+                if self.conditions.actions:
+                    for action in self.conditions.actions:
+                        position = action.execute(position=position)
+                        if position:
+                            yield position
+                        else:
+                            continue
                 else:
                     yield position
 

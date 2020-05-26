@@ -1,21 +1,31 @@
-class Point:
-    def __init__(self, x: int, y: int):
-        self._x = x
-        self._y = y
+class GlobalClass:
 
-    def __add__(self, other_point):
-        return Point(x=self._x + other_point._x, y=self._y + other_point._y)
+    def __init__(self, x, y=None):
+        self.x = x
+        self.y = y
 
-    def __repr__(self):
-        return 'Point(x={x}, y={y})'.format(x=self._x, y=self._y)
+    def __eq__(self, other):
+        print("eq")
+        return self.x == other.x and self.y == other.y
+
+    def __lt__(self, other):
+        return self.x < other.x and self.y < other.y
+
+    def __le__(self, other):
+        return self.x <= other.x and self.y <= other.y
+
+    def __gt__(self, other):
+        return self.x > other.y and self.y > other.y
 
 
-point1 = Point(x=1, y=1)
-point2 = Point(x=2, y=2)
-point4 = point1 + point2
+a = GlobalClass(5, 6)
+b = GlobalClass(5, 8)
+c = a == b
+print(c)
+print(a < b)
+print(a > b)
+print(a <= b)
+print(2 < 3 < 4)
 
-print(point1)
-print(point2)
-print(point4)
 
 
