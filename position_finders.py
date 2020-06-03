@@ -3,34 +3,31 @@ from base_types import PositionFinderAbstract, CellValue, CellPosition, CellOffs
 
 class AllRowNumsFinder(PositionFinderAbstract):
     def get_position(self) -> CellPosition:
-        for row in self.conditions.cell_finder.get_all_indexes(axis=1):
+        for row in self.condition_container.cell_finder.get_all_indexes(axis=1):
             yield CellPosition(row=row)
 
 
 class AllColNumsFinder(PositionFinderAbstract):
     def get_position(self) -> CellPosition:
-        for col in self.conditions.cell_finder.get_all_indexes(axis=0):
+        for col in self.condition_container.cell_finder.get_all_indexes(axis=0):
             yield CellPosition(col=col)
 
 
 class AllCellPositionsFinder(PositionFinderAbstract):
     def get_position(self) -> CellPosition:
         row_num_finder = AllRowNumsFinder(df=self._df)
-        row_num_finder.conditions = self.conditions
+        row_num_finder.condition_container = self.condition_container
         for row_position in row_num_finder.get_position():
             col_num_finder = AllColNumsFinder(sr=self._df.iloc[row_position.row, :])
-            col_num_finder.conditions = self.conditions
+            col_num_finder.condition_container = self.condition_container
             for col_position in col_num_finder.get_position():
                 position = row_position + col_position
-                if self.conditions.actions:
-                    for action in self.conditions.actions:
+                if self.condition_container.actions:
+                    for action in self.condition_container.actions:
                         position = action.execute(position=position)
-                        if position:
-                            yield position
-                        else:
-                            continue
-                else:
-                    yield position
+                        if not position:
+                            break
+                yield position
 
 
 class FirstRowNumFinder(PositionFinderAbstract):
@@ -40,7 +37,7 @@ class FirstRowNumFinder(PositionFinderAbstract):
         else:
             row_num_finder = AllRowNumsFinder(sr=self._sr)
 
-        row_num_finder.conditions = self.conditions
+        row_num_finder.condition_container = self.condition_container
         for row_position in row_num_finder.get_position():
             # Была найдена первая строка
             result = row_position
@@ -58,7 +55,7 @@ class FirstColNumFinder(PositionFinderAbstract):
         else:
             col_num_finder = AllColNumsFinder(sr=self._sr)
 
-        col_num_finder.conditions = self.conditions
+        col_num_finder.condition_container = self.condition_container
         for col_position in col_num_finder.get_position():
             # Был найден первый столбец
             result = col_position
@@ -72,10 +69,10 @@ class FirstColNumFinder(PositionFinderAbstract):
 class FirstCellPositionFinder(PositionFinderAbstract):
     def get_position(self) -> CellPosition:
         row_num_finder = FirstRowNumFinder(df=self._df)
-        row_num_finder.conditions = self.conditions
+        row_num_finder.condition_container = self.condition_container
         row_position = row_num_finder.get_position()
         col_num_finder = FirstColNumFinder(sr=self._df.iloc[row_position.row, :])
-        col_num_finder.conditions = self.conditions
+        col_num_finder.condition_container = self.condition_container
         return row_position + col_num_finder.get_position()
 
 

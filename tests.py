@@ -4,7 +4,8 @@ from itertools import zip_longest
 import numpy as np
 import pandas as pd
 
-from base_types import ExcelConstants, CellValue, CellPosition, CellOffset, ExcelCell, NeighborCell
+from base_types import ExcelConstants, CellValue, CellPosition, CellOffset, ExcelCell, NeighborCell, \
+    ExactCellValueCondition
 from position_finders import FirstRowNumFinder, FirstColNumFinder, FirstCellPositionFinder, AllRowNumsFinder, \
     AllCellPositionsFinder, AllColNumsFinder
 from data import simple_data, duplicates_data
@@ -17,7 +18,7 @@ class TestTDS(unittest.TestCase):
         self.duplicates_df = pd.DataFrame.from_dict(data=duplicates_data['data'], columns=duplicates_data['columns'],
                                                     orient='index')
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_position(self):
         cells_offsets_results = [
             (CellOffset(col=-1, row=-1), CellPosition(col=0, row=0)),
@@ -65,7 +66,7 @@ class TestTDS(unittest.TestCase):
         self.assertNotEqual(CellPosition(), CellPosition(row=1))
         self.assertNotEqual(CellPosition(), CellPosition(col=1, row=1))
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_rownum_finder(self):
         cell_values_results = [
             (CellValue('SKU'), CellPosition(row=0)),
@@ -80,10 +81,10 @@ class TestTDS(unittest.TestCase):
         ]
         position_finder = FirstRowNumFinder(df=self.simple_df)
         for cell_value, result_position in cell_values_results:
-            position_finder.conditions.exact_cell_value = cell_value
+            position_finder.condition_container.exact_cell_value = cell_value
             self.assertEqual(position_finder.get_position(), result_position)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_colnum_finder(self):
         cell_values_results = [
             (CellValue('SKU'), CellPosition(col=0)),
@@ -99,10 +100,10 @@ class TestTDS(unittest.TestCase):
         ]
         position_finder = FirstColNumFinder(df=self.simple_df)
         for cell_value, result_positions in cell_values_results:
-            position_finder.conditions.exact_cell_value = cell_value
+            position_finder.condition_container.exact_cell_value = cell_value
             self.assertEqual(position_finder.get_position(), result_positions)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_position_finder(self):
         cell_values_results = [
             (CellValue('SKU'), CellPosition(col=0, row=0)),
@@ -114,10 +115,10 @@ class TestTDS(unittest.TestCase):
         ]
         position_finder = FirstCellPositionFinder(df=self.simple_df)
         for cell_value, result_position in cell_values_results:
-            position_finder.conditions.exact_cell_value = cell_value
+            position_finder.condition_container.exact_cell_value = cell_value
             self.assertEqual(position_finder.get_position(), result_position)
 
-    # @unittest.skip
+    @unittest.skip
     def test_excell_cell(self):
         self.assertEqual(ExcelCell(cell_name='A1').cell_position, CellPosition(col=0, row=0))
         excell_cell = ExcelCell(cell_name='b2')
@@ -151,7 +152,7 @@ class TestTDS(unittest.TestCase):
         self.assertRaises(Exception, ExcelCell, cell_name='ш1')
         self.assertRaises(Exception, ExcelCell, cell_name='a' + str(ExcelConstants.MAX_EXCEL_ROWS_COUNT + 10))
 
-    # @unittest.skip
+    @unittest.skip
     def test_all_row_nums_finder(self):
         all_row_nums_finder = AllRowNumsFinder(df=self.duplicates_df)
         cell_values_results = [
@@ -179,7 +180,7 @@ class TestTDS(unittest.TestCase):
             (CellValue(-999), [])
         ]
         for cell_value, expected_result_positions in cell_values_results:
-            all_row_nums_finder.conditions.exact_cell_value = cell_value
+            all_row_nums_finder.condition_container.exact_cell_value = cell_value
             fact_result_positions = all_row_nums_finder.get_all_positions()
             self.assertEqual(len(expected_result_positions), len(fact_result_positions))
             if fact_result_positions:
@@ -234,7 +235,8 @@ class TestTDS(unittest.TestCase):
             (CellValue(-999), [])
         ]
         for cell_value, expected_result_positions in cell_values_results:
-            all_col_nums_finder.conditions.exact_cell_value = cell_value
+            condition_container = all_col_nums_finder.condition_container
+            condition_container.cell_finder = ExactCellValueCondition(cell_value=cell_value, df=self.duplicates_df)
             fact_result_positions = all_col_nums_finder.get_all_positions()
             if fact_result_positions:
                 zip_result = zip_longest(fact_result_positions, expected_result_positions)
@@ -244,7 +246,7 @@ class TestTDS(unittest.TestCase):
                 self.assertEqual(fact_result_positions, expected_result_positions)
                 self.assertEqual(fact_result_positions, cell_values_results[-1][1])
 
-    # @unittest.skip
+    @unittest.skip
     def test_neighbor(self):
         data_set = [
             (CellPosition(col=0, row=0), CellValue(4302), CellOffset(col=1, row=1), True),
@@ -274,7 +276,7 @@ class TestTDS(unittest.TestCase):
             neighbor = NeighborCell(df=self.simple_df, cell_value=cell_value, cell_offset=cell_offset)
             self.assertEqual(neighbor.is_neighbor(cell_position), result)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_value(self):
         cell_values_numbers_results = [
             (CellValue(1), CellValue(1)),
@@ -398,7 +400,7 @@ class TestTDS(unittest.TestCase):
 
         # TODO: datetime, datetime + timezone, time, 1E+4, 1.1 != '1.1'
 
-    # @unittest.skip
+    @unittest.skip
     def test_all_positions(self):
         cell_values_results = [
             (CellValue(4302), [CellPosition(col=1, row=1), CellPosition(col=1, row=3)]),
@@ -457,11 +459,11 @@ class TestTDS(unittest.TestCase):
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_value, results in cell_values_results:
-            finder.conditions.exact_cell_value = cell_value
+            finder.condition_container.exact_cell_value = cell_value
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_values_finder(self):
         cell_values_results = [
             (
@@ -488,11 +490,11 @@ class TestTDS(unittest.TestCase):
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_values, results in cell_values_results:
-            finder.conditions.exact_cell_values = cell_values
+            finder.condition_container.exact_cell_values = cell_values
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_value_finder_with_neighbors(self):
         cell_values_neighbors_results = [
             (
@@ -551,12 +553,12 @@ class TestTDS(unittest.TestCase):
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_value, neighbors, results in cell_values_neighbors_results:
-            finder.conditions.exact_cell_value = cell_value
-            finder.conditions.neighbors_cells = neighbors
+            finder.condition_container.exact_cell_value = cell_value
+            finder.condition_container.neighbors_cells = neighbors
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 
-    # @unittest.skip
+    @unittest.skip
     def test_cell_values_finder_with_neighbors(self):
         cell_values_neighbors_results = [
             (
@@ -567,12 +569,12 @@ class TestTDS(unittest.TestCase):
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_values, neighbors, results in cell_values_neighbors_results:
-            finder.conditions.exact_cell_values = cell_values
-            finder.conditions.neighbors_cells = neighbors
+            finder.condition_container.exact_cell_values = cell_values
+            finder.condition_container.neighbors_cells = neighbors
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 
-    # @unittest.skip
+    @unittest.skip
     def test_regex_cell_value_pattern(self):
         patterns_results = [
             (
@@ -586,10 +588,11 @@ class TestTDS(unittest.TestCase):
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for pattern, results in patterns_results:
-            finder.conditions.regex_cell_value_pattern = pattern
+            finder.condition_container.regex_cell_value_pattern = pattern
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 
+    @unittest.skip
     def test_cell_value_finder_with_offset(self):
         cell_values_results = [
             (CellValue('SKU'), CellOffset(col=1, row=0), [CellPosition(col=1, row=0)]),
@@ -606,11 +609,12 @@ class TestTDS(unittest.TestCase):
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_value, cell_offset, results in cell_values_results:
-            finder.conditions.exact_cell_value = cell_value
-            finder.conditions.cell_offset = cell_offset
+            finder.condition_container.exact_cell_value = cell_value
+            finder.condition_container.cell_offset = cell_offset
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 
+    @unittest.skip
     def test_regex_finder_with_offset_neighbors(self):
         patterns_results = [
             (
@@ -618,8 +622,6 @@ class TestTDS(unittest.TestCase):
 
             )
         ]
-
-
 
     def _check_results(self, expected_result: list, finder_result: list):
         self.assertEqual(len(expected_result), len(finder_result))
