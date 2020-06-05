@@ -207,13 +207,31 @@ class ExcelCell:
         return f'ExcelCell(cell_name="{self._cell_name}")'
 
 
-class ConditionChecker:
-    def __init__(self, func, **kwargs):
-        self._func = func
-        self._kwargs = kwargs
+class ValueFinderAbstract(ABC):
+    condition_type = ''
 
-    def check(self):
-        return self._func(**self._kwargs)
+    def __init__(self):
+        self._df = None
+        self._sr = None
+
+    @property
+    def df(self):
+        return self._df
+
+    @df.setter
+    def df(self, other_df: pd.DataFrame):
+        self._df = other_df
+
+    @property
+    def sr(self):
+        return self._sr
+
+    @sr.setter
+    def sr(self, other_sr: pd.Series):
+        self._sr = other_sr
+
+    @abstractmethod
+    def get_all_indexes(self, axis: int): raise NotImplementedError
 
 
 class PositionFinderAbstract(ABC):
@@ -222,7 +240,17 @@ class PositionFinderAbstract(ABC):
             raise Exception('Either the "df" or "sr" must be specified')
         self._df = df
         self._sr = sr
-        self.condition_container = ConditionContainer()
+        self._value_finder = None
+
+    @property
+    def value_finder(self):
+        return self._value_finder
+
+    @value_finder.setter
+    def value_finder(self, other_value_finder: ValueFinderAbstract):
+        self._value_finder = other_value_finder
+        self._value_finder.df = self._df
+        self._value_finder.sr = self._sr
 
     @abstractmethod
     def get_position(self): raise NotImplementedError
@@ -304,27 +332,12 @@ class NeighborCell:
         return f'NeighborCell(df, {self._cell_value.__repr__()}, {self._cell_offset.__repr__()})'
 
 
-class FinderConditionAbstract(ABC):
-    condition_type = ''
-
-    def __init__(self, **kwargs):
-        df = kwargs.get('df')
-        sr = kwargs.get('sr')
-        if (df is None and sr is None) or (df is not None and sr is not None):
-            raise Exception('Either the "df" or "sr" must be specified')
-        self._df = df
-        self._sr = sr
-
-    @abstractmethod
-    def get_all_indexes(self, axis: int): raise NotImplementedError
-
-
-class ExactCellValueCondition(FinderConditionAbstract):
+class ExactValueFinder(ValueFinderAbstract):
     condition_type = 'exact_cell_value'
 
-    def __init__(self, cell_value: CellValue, **kwargs):
+    def __init__(self, cell_value: CellValue):
         self._cell_value = cell_value
-        super().__init__(**kwargs)
+        super().__init__()
 
     def get_all_indexes(self, axis: int) -> np.array:
         if self._cell_value:
@@ -347,12 +360,12 @@ class ExactCellValueCondition(FinderConditionAbstract):
         return res
 
 
-class ExactCellValuesCondition(FinderConditionAbstract):
+class ExactValuesFinder(ValueFinderAbstract):
     condition_type = 'exact_cell_values'
 
-    def __init__(self, cell_values: List[CellValue], **kwargs):
+    def __init__(self, cell_values: List[CellValue]):
         self._cell_values = cell_values
-        super().__init__(**kwargs)
+        super().__init__()
 
     def get_all_indexes(self, axis: int) -> np.array:
         values = list(set([cell_value.value for cell_value in self._cell_values]))
@@ -385,12 +398,12 @@ class ExactCellValuesCondition(FinderConditionAbstract):
         return res
 
 
-class RegexCondition(FinderConditionAbstract):
+class RegexFinder(ValueFinderAbstract):
     condition_type = 'regex'
 
-    def __init__(self, cell_value: CellValue, **kwargs):
+    def __init__(self, cell_value: CellValue):
         self._cell_value = cell_value
-        super().__init__(**kwargs)
+        super().__init__()
 
     def get_all_indexes(self, axis: int) -> np.array:
         pattern = self._cell_value.value
