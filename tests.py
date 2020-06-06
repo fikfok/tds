@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from base_types import ExcelConstants, CellValue, CellPosition, CellOffset, ExcelCell, NeighborCell, \
-    ExactValueFinder, ExactValuesFinder, RegexFinder
+    ExactValueFinder, ExactValuesFinder, RegexFinder, NeighborsContainer, CellOffsetAction
 from position_finders import FirstRowNumFinder, FirstColNumFinder, FirstCellPositionFinder, AllRowNumsFinder, \
     AllCellPositionsFinder, AllColNumsFinder
 from data import simple_data, duplicates_data
@@ -118,7 +118,7 @@ class TestTDS(unittest.TestCase):
             position_finder.value_finder = ExactValueFinder(cell_value)
             self.assertEqual(position_finder.get_position(), result_position)
 
-    @unittest.skip
+    # @unittest.skip
     def test_excell_cell(self):
         self.assertEqual(ExcelCell(cell_name='A1').cell_position, CellPosition(col=0, row=0))
         excell_cell = ExcelCell(cell_name='b2')
@@ -152,7 +152,7 @@ class TestTDS(unittest.TestCase):
         self.assertRaises(Exception, ExcelCell, cell_name='ш1')
         self.assertRaises(Exception, ExcelCell, cell_name='a' + str(ExcelConstants.MAX_EXCEL_ROWS_COUNT + 10))
 
-    @unittest.skip
+    # @unittest.skip
     def test_all_row_nums_finder(self):
         all_row_nums_finder = AllRowNumsFinder(df=self.duplicates_df)
         cell_values_results = [
@@ -180,7 +180,7 @@ class TestTDS(unittest.TestCase):
             (CellValue(-999), [])
         ]
         for cell_value, expected_result_positions in cell_values_results:
-            all_row_nums_finder.condition_container.exact_cell_value = cell_value
+            all_row_nums_finder.value_finder = ExactValueFinder(cell_value=cell_value)
             fact_result_positions = all_row_nums_finder.get_all_positions()
             self.assertEqual(len(expected_result_positions), len(fact_result_positions))
             if fact_result_positions:
@@ -193,7 +193,7 @@ class TestTDS(unittest.TestCase):
 
     # @unittest.skip
     def test_all_col_nums_finder(self):
-        all_col_nums_finder = AllColNumsFinder(df=self.duplicates_df)
+        finder = AllColNumsFinder(df=self.duplicates_df)
         cell_values_results = [
             (
                 CellValue('Общий итог'),
@@ -235,8 +235,8 @@ class TestTDS(unittest.TestCase):
             (CellValue(-999), [])
         ]
         for cell_value, expected_result_positions in cell_values_results:
-            all_col_nums_finder.value_finder = ExactValueFinder(cell_value=cell_value)
-            fact_result_positions = all_col_nums_finder.get_all_positions()
+            finder.value_finder = ExactValueFinder(cell_value=cell_value)
+            fact_result_positions = finder.get_all_positions()
             if fact_result_positions:
                 zip_result = zip_longest(fact_result_positions, expected_result_positions)
                 for fact_position, expected_position in zip_result:
@@ -493,7 +493,7 @@ class TestTDS(unittest.TestCase):
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 
-    @unittest.skip
+    # @unittest.skip
     def test_cell_value_finder_with_neighbors(self):
         cell_values_neighbors_results = [
             (
@@ -552,12 +552,12 @@ class TestTDS(unittest.TestCase):
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_value, neighbors, results in cell_values_neighbors_results:
-            finder.condition_container.exact_cell_value = cell_value
-            finder.condition_container.neighbors_cells = neighbors
+            finder.value_finder = ExactValueFinder(cell_value=cell_value)
+            finder.neighbors_container = NeighborsContainer(neighbors=neighbors)
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 
-    @unittest.skip
+    # @unittest.skip
     def test_cell_values_finder_with_neighbors(self):
         cell_values_neighbors_results = [
             (
@@ -568,8 +568,8 @@ class TestTDS(unittest.TestCase):
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_values, neighbors, results in cell_values_neighbors_results:
-            finder.condition_container.exact_cell_values = cell_values
-            finder.condition_container.neighbors_cells = neighbors
+            finder.value_finder = ExactValuesFinder(cell_values=cell_values)
+            finder.neighbors_container = NeighborsContainer(neighbors=neighbors)
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 
@@ -591,7 +591,7 @@ class TestTDS(unittest.TestCase):
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 
-    @unittest.skip
+    # @unittest.skip
     def test_cell_value_finder_with_offset(self):
         cell_values_results = [
             (CellValue('SKU'), CellOffset(col=1, row=0), [CellPosition(col=1, row=0)]),
@@ -608,8 +608,8 @@ class TestTDS(unittest.TestCase):
         ]
         finder = AllCellPositionsFinder(df=self.duplicates_df)
         for cell_value, cell_offset, results in cell_values_results:
-            finder.condition_container.exact_cell_value = cell_value
-            finder.condition_container.cell_offset = cell_offset
+            finder.value_finder = ExactValueFinder(cell_value=cell_value)
+            finder.cell_offset_action = CellOffsetAction(cell_offset=cell_offset)
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 

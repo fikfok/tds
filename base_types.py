@@ -96,7 +96,8 @@ class CellPosition:
         return CellPosition(col=col, row=row)
 
     def __bool__(self):
-        return bool(self._col) or bool(self._row)
+        # return bool(self._col) or bool(self._row)
+        return self._col is not None or self._row is not None
 
     def _add_two_values(self, first: [np.integer, int, None], second: [np.integer, int, None]) -> [int, None]:
         res = None
@@ -211,27 +212,29 @@ class ValueFinderAbstract(ABC):
     condition_type = ''
 
     def __init__(self):
-        self._df = None
-        self._sr = None
-
-    @property
-    def df(self):
-        return self._df
-
-    @df.setter
-    def df(self, other_df: pd.DataFrame):
-        self._df = other_df
-
-    @property
-    def sr(self):
-        return self._sr
-
-    @sr.setter
-    def sr(self, other_sr: pd.Series):
-        self._sr = other_sr
+        self.df = None
+        self.sr = None
 
     @abstractmethod
     def get_all_indexes(self, axis: int): raise NotImplementedError
+
+
+class CellOffsetAction:
+    def __init__(self, cell_offset: CellOffset):
+        self._df = None
+        self._cell_offset = cell_offset
+
+    def get_position(self, position: CellPosition) -> CellPosition:
+        if self._df is None:
+            raise Exception('_df must not be None')
+
+        if position:
+            res = position + self._cell_offset
+            if not res.in_scope(df=self._df):
+                res = CellPosition()
+        else:
+            res = CellPosition()
+        return res
 
 
 class PositionFinderAbstract(ABC):
@@ -241,6 +244,8 @@ class PositionFinderAbstract(ABC):
         self._df = df
         self._sr = sr
         self._value_finder = None
+        self.neighbors_container = None
+        self._cell_offset_action = None
 
     @property
     def value_finder(self):
@@ -251,6 +256,15 @@ class PositionFinderAbstract(ABC):
         self._value_finder = other_value_finder
         self._value_finder.df = self._df
         self._value_finder.sr = self._sr
+
+    @property
+    def cell_offset_action(self):
+        return self._cell_offset_action
+
+    @cell_offset_action.setter
+    def cell_offset_action(self, other_cell_offset_action: CellOffsetAction):
+        self._cell_offset_action = other_cell_offset_action
+        self._cell_offset_action._df = self._df
 
     @abstractmethod
     def get_position(self): raise NotImplementedError
@@ -342,19 +356,19 @@ class ExactValueFinder(ValueFinderAbstract):
     def get_all_indexes(self, axis: int) -> np.array:
         if self._cell_value:
             # cell_value не пустое значение
-            if self._df is not None:
-                seria = self._df[self._df.eq(self._cell_value.value)].notna().any(axis=axis)
+            if self.df is not None:
+                seria = self.df[self.df.eq(self._cell_value.value)].notna().any(axis=axis)
             else:
-                seria = self._sr.eq(self._cell_value.value)
+                seria = self.sr.eq(self._cell_value.value)
         else:
             # exact_cell_value пустое значение.
             # Пустым значением могут быть варианты: '', None, np.NaN.
             # С None и np.NaN функция .isnull() справится, т.е. поставит True в нужную позицию.
             # А вот с '' не справится и поставит False. Потому предварительно '' необходимо заменить на None.
-            if self._df is not None:
-                seria = self._df.replace(to_replace={'': None}).isnull().any(axis=axis)
+            if self.df is not None:
+                seria = self.df.replace(to_replace={'': None}).isnull().any(axis=axis)
             else:
-                seria = self._sr.replace(to_replace={'': None}).isnull()
+                seria = self.sr.replace(to_replace={'': None}).isnull()
 
         res = seria[seria].index.values
         return res
@@ -376,17 +390,17 @@ class ExactValuesFinder(ValueFinderAbstract):
         if empty_value_exists:
             # В списке есть пустое значение, значит предстоит проверка на пустое значение. Значит необходимо
             # '' заменить на None в df
-            if self._df is not None:
-                seria_nulls = self._df.replace(to_replace={'': None}).isnull().any(axis=axis)
+            if self.df is not None:
+                seria_nulls = self.df.replace(to_replace={'': None}).isnull().any(axis=axis)
             else:
-                seria_nulls = self._sr.replace(to_replace={'': None}).isnull()
+                seria_nulls = self.sr.replace(to_replace={'': None}).isnull()
 
         if len(values_wo_nulls):
             # В списке есть реальные значения
-            if self._df is not None:
-                seria_wo_nulls = self._df[self._df.isin(values_wo_nulls)].notna().any(axis=axis)
+            if self.df is not None:
+                seria_wo_nulls = self.df[self.df.isin(values_wo_nulls)].notna().any(axis=axis)
             else:
-                seria_wo_nulls = self._sr.isin(values_wo_nulls)
+                seria_wo_nulls = self.sr.isin(values_wo_nulls)
 
         if seria_nulls is not None and seria_wo_nulls is not None:
             seria = seria_nulls + seria_wo_nulls
@@ -407,57 +421,29 @@ class RegexFinder(ValueFinderAbstract):
 
     def get_all_indexes(self, axis: int) -> np.array:
         pattern = self._cell_value.value
-        if self._df is not None:
-            seria = self._df.apply(lambda seria: seria.astype(str).str.match(pattern)).any(axis=axis)
+        if self.df is not None:
+            seria = self.df.apply(lambda seria: seria.astype(str).str.match(pattern)).any(axis=axis)
         else:
-            seria = self._sr.astype(str).str.match(pattern)
+            seria = self.sr.astype(str).str.match(pattern)
         res = seria[seria].index.values
         return res
 
 
-class ActionAbstract(ABC):
-    """
-    Выполняет действие над ячейкой
-    """
-    @abstractmethod
-    def __init__(self, **kwargs): raise NotImplementedError
-
-    @abstractmethod
-    def execute(self, **kwargs): raise NotImplementedError
-
-
-class CellOffsetAction(ActionAbstract):
-    def __init__(self, df: pd.DataFrame, cell_offset: CellOffset):
-        self._df = df
-        self._cell_offset = cell_offset
-
-    def execute(self, position: CellPosition):
-        if position:
-            res = position + self._cell_offset
-            if not res.in_scope(df=self._df):
-                res = CellPosition()
-        else:
-            res = CellPosition()
-        return res
-
-
-class NeighborsAction(ActionAbstract):
-    def __init__(self, df: pd.DataFrame, neighbors: [List[NeighborCell], NeighborCell]):
-        self._df = df
+class NeighborsContainer:
+    def __init__(self, neighbors: [List[NeighborCell], NeighborCell]):
         if isinstance(neighbors, list):
             self._neighbors = neighbors
         else:
             self._neighbors = [neighbors]
 
-    def execute(self, position: CellPosition):
+    def is_neighbors_for(self, position: CellPosition) -> bool:
+        res = False
         if position:
             is_neighbor = all([neighbor.is_neighbor(position) for neighbor in self._neighbors])
             if is_neighbor:
-                res = position
+                res = True
             else:
-                res = CellPosition()
-        else:
-            res = CellPosition()
+                res = False
         return res
 
 

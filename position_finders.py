@@ -22,11 +22,13 @@ class AllCellPositionsFinder(PositionFinderAbstract):
             col_num_finder.value_finder = self.value_finder
             for col_position in col_num_finder.get_position():
                 position = row_position + col_position
-                # if self.condition_container.actions:
-                #     for action in self.condition_container.actions:
-                #         position = action.execute(position=position)
-                #         if not position:
-                #             break
+                if self.neighbors_container:
+                    if not self.neighbors_container.is_neighbors_for(position=position):
+                        continue
+                if self._cell_offset_action:
+                    position = self._cell_offset_action.get_position(position=position)
+                    if not position:
+                        continue
                 yield position
 
 
