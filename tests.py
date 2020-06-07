@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 
 from base_types import ExcelConstants, CellValue, CellPosition, CellOffset, ExcelCell, NeighborCell, \
-    ExactValueFinder, ExactValuesFinder, RegexFinder, NeighborsContainer, CellOffsetAction
+    ExactValueFinder, ExactValuesFinder, RegexFinder, NeighborsContainer, CellOffsetAction, StartWithFinder, \
+    EndWithFinder
 from position_finders import FirstRowNumFinder, FirstColNumFinder, FirstCellPositionFinder, AllRowNumsFinder, \
     AllCellPositionsFinder, AllColNumsFinder
 from data import simple_data, duplicates_data
@@ -79,10 +80,10 @@ class TestTDS(unittest.TestCase):
             (CellValue('Qwerty'), CellPosition()),
             (CellValue(-999), CellPosition()),
         ]
-        position_finder = FirstRowNumFinder(df=self.simple_df)
+        finder = FirstRowNumFinder(df=self.simple_df)
         for cell_value, result_position in cell_values_results:
-            position_finder.value_finder = ExactValueFinder(cell_value=cell_value)
-            self.assertEqual(position_finder.get_position(), result_position)
+            finder.value_finder = ExactValueFinder(cell_value=cell_value)
+            self.assertEqual(finder.get_position(), result_position)
 
     # @unittest.skip
     def test_cell_colnum_finder(self):
@@ -98,10 +99,10 @@ class TestTDS(unittest.TestCase):
             (CellValue(-999), CellPosition()),
 
         ]
-        position_finder = FirstColNumFinder(df=self.simple_df)
+        finder = FirstColNumFinder(df=self.simple_df)
         for cell_value, result_positions in cell_values_results:
-            position_finder.value_finder = ExactValueFinder(cell_value)
-            self.assertEqual(position_finder.get_position(), result_positions)
+            finder.value_finder = ExactValueFinder(cell_value)
+            self.assertEqual(finder.get_position(), result_positions)
 
     # @unittest.skip
     def test_cell_position_finder(self):
@@ -113,10 +114,10 @@ class TestTDS(unittest.TestCase):
             (CellValue('ЭКСХОЛ КАПС 250 МГ №10'), CellPosition(col=0, row=197)),
             (CellValue(105153489.25), CellPosition(col=6, row=204)),
         ]
-        position_finder = FirstCellPositionFinder(df=self.simple_df)
+        finder = FirstCellPositionFinder(df=self.simple_df)
         for cell_value, result_position in cell_values_results:
-            position_finder.value_finder = ExactValueFinder(cell_value)
-            self.assertEqual(position_finder.get_position(), result_position)
+            finder.value_finder = ExactValueFinder(cell_value)
+            self.assertEqual(finder.get_position(), result_position)
 
     # @unittest.skip
     def test_excell_cell(self):
@@ -154,7 +155,7 @@ class TestTDS(unittest.TestCase):
 
     # @unittest.skip
     def test_all_row_nums_finder(self):
-        all_row_nums_finder = AllRowNumsFinder(df=self.duplicates_df)
+        finder = AllRowNumsFinder(df=self.duplicates_df)
         cell_values_results = [
             (
                 CellValue('*АРИТЕЛ ПЛЮС ТБ П/О 2,5МГ+6,25МГ №30'),
@@ -180,8 +181,8 @@ class TestTDS(unittest.TestCase):
             (CellValue(-999), [])
         ]
         for cell_value, expected_result_positions in cell_values_results:
-            all_row_nums_finder.value_finder = ExactValueFinder(cell_value=cell_value)
-            fact_result_positions = all_row_nums_finder.get_all_positions()
+            finder.value_finder = ExactValueFinder(cell_value=cell_value)
+            fact_result_positions = finder.get_all_positions()
             self.assertEqual(len(expected_result_positions), len(fact_result_positions))
             if fact_result_positions:
                 zip_result = zip_longest(fact_result_positions, expected_result_positions)
@@ -270,7 +271,6 @@ class TestTDS(unittest.TestCase):
             (CellPosition(col=1, row=1), CellValue(4302), CellOffset(col=0, row=0), True),
             (CellPosition(col=0, row=0), CellValue(1), CellOffset(col=1, row=1), False),
         ]
-
         for cell_position, cell_value, cell_offset, result in data_set:
             neighbor = NeighborCell(df=self.simple_df, cell_value=cell_value, cell_offset=cell_offset)
             self.assertEqual(neighbor.is_neighbor(cell_position), result)
@@ -610,6 +610,54 @@ class TestTDS(unittest.TestCase):
         for cell_value, cell_offset, results in cell_values_results:
             finder.value_finder = ExactValueFinder(cell_value=cell_value)
             finder.cell_offset_action = CellOffsetAction(cell_offset=cell_offset)
+            finder_results = finder.get_all_positions()
+            self._check_results(expected_result=results, finder_result=finder_results)
+
+    # @unittest.skip
+    def test_startwith(self):
+        patterns_results = [
+            (
+                '*',
+                [
+                    CellPosition(col=0, row=1), CellPosition(col=0, row=2), CellPosition(col=0, row=3),
+                    CellPosition(col=0, row=4), CellPosition(col=0, row=5), CellPosition(col=0, row=6),
+                    CellPosition(col=0, row=7), CellPosition(col=0, row=8), CellPosition(col=0, row=9),
+                    CellPosition(col=0, row=10), CellPosition(col=0, row=11), CellPosition(col=0, row=12),
+                    CellPosition(col=0, row=13), CellPosition(col=0, row=14), CellPosition(col=0, row=15),
+                ]
+            ),
+            (
+                'НЕБИВОЛОЛ-',
+                [CellPosition(col=0, row=132), CellPosition(col=0, row=133)]
+            ),
+            (
+                '102',
+                []
+            ),
+            # TODO ДОбавить ещё проверки. Вариант котороый есть ив текстовой ячейке и числовой
+        ]
+        finder = AllCellPositionsFinder(df=self.simple_df)
+        for value, results in patterns_results:
+            finder.value_finder = StartWithFinder(cell_value=CellValue(value))
+            finder_results = finder.get_all_positions()
+            self._check_results(expected_result=results, finder_result=finder_results)
+
+    # @unittest.skip
+    def test_endwith(self):
+        patterns_results = [
+            (
+                '2,5МГ+6,25МГ №30',
+                [CellPosition(col=0, row=1), CellPosition(col=0, row=3)]
+            ),
+            (
+                '25',
+                []
+            ),
+            # TODO ДОбавить ещё проверки. Вариант котороый есть ив текстовой ячейке и числовой
+        ]
+        finder = AllCellPositionsFinder(df=self.duplicates_df)
+        for value, results in patterns_results:
+            finder.value_finder = EndWithFinder(cell_value=CellValue(value))
             finder_results = finder.get_all_positions()
             self._check_results(expected_result=results, finder_result=finder_results)
 

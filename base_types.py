@@ -4,6 +4,7 @@ from typing import List
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_string_dtype
 
 
 class ExcelConstants:
@@ -413,6 +414,9 @@ class ExactValuesFinder(ValueFinderAbstract):
 
 
 class RegexFinder(ValueFinderAbstract):
+    """
+    Only for string columns
+    """
     condition_type = 'regex'
 
     def __init__(self, cell_value: CellValue):
@@ -422,9 +426,50 @@ class RegexFinder(ValueFinderAbstract):
     def get_all_indexes(self, axis: int) -> np.array:
         pattern = self._cell_value.value
         if self.df is not None:
-            seria = self.df.apply(lambda seria: seria.astype(str).str.match(pattern)).any(axis=axis)
+            seria = self.df. \
+                apply(lambda s: s.astype(str).str.match(pattern, na=False) if is_string_dtype(s) else False). \
+                any(axis=axis)
         else:
-            seria = self.sr.astype(str).str.match(pattern)
+            # Т.к. это regex, то необходимо обязательно конвертировать в строку
+            seria = self.sr.astype(str).str.match(pattern, na=False)
+        res = seria[seria].index.values
+        return res
+
+
+class StartWithFinder(ValueFinderAbstract):
+    condition_type = 'start_with'
+
+    def __init__(self, cell_value: CellValue):
+        self._cell_value = cell_value
+        super().__init__()
+
+    def get_all_indexes(self, axis: int) -> np.array:
+        value = self._cell_value.value
+        if self.df is not None:
+            seria = self.df. \
+                apply(lambda s: s.astype(str).str.startswith(value, na=False) if is_string_dtype(s) else False). \
+                any(axis=axis)
+        else:
+            seria = self.sr.str.startswith(value, na=False)
+        res = seria[seria].index.values
+        return res
+
+
+class EndWithFinder(ValueFinderAbstract):
+    condition_type = 'end_with'
+
+    def __init__(self, cell_value: CellValue):
+        self._cell_value = cell_value
+        super().__init__()
+
+    def get_all_indexes(self, axis: int) -> np.array:
+        value = self._cell_value.value
+        if self.df is not None:
+            seria = self.df. \
+                apply(lambda s: s.astype(str).str.endswith(value, na=False) if is_string_dtype(s) else False). \
+                any(axis=axis)
+        else:
+            seria = self.sr.str.endswith(value, na=False)
         res = seria[seria].index.values
         return res
 
