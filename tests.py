@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 
 from base_types import ExcelConstants, CellValue, CellPosition, CellOffset, ExcelCell, NeighborCell, \
-    ExactValueFinder, ExactValuesFinder, RegexFinder, NeighborsContainer, CellOffsetAction, StartWithFinder, \
-    EndWithFinder
+    NeighborsContainer, CellOffsetAction
+from value_finders import ExactValueFinder, ExactValuesFinder, RegexFinder, StartWithFinder, EndWithFinder
 from position_finders import FirstRowNumFinder, FirstColNumFinder, FirstCellPositionFinder, AllRowNumsFinder, \
     AllCellPositionsFinder, AllColNumsFinder
 from data import simple_data, duplicates_data

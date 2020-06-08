@@ -1,10 +1,10 @@
 import itertools
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import List
 
 import numpy as np
 import pandas as pd
-from pandas.api.types import is_string_dtype
 
 
 class ExcelConstants:
@@ -15,6 +15,14 @@ class ExcelConstants:
     _all_columns_labels = list(_first_columns_labels)
     _all_columns_labels += [''.join(item) for item in itertools.product(_first_columns_labels, repeat=3)]
     ALL_COLUMNS_LABELS = _all_columns_labels[:MAX_EXCEL_COLUMNS_COUNT]
+
+
+class IndexesMask(Enum):
+    Wrong = -1
+    OnlyChar = 1
+    OnlyDigit = 2
+    CharDigit = 3
+    DigitChar = 4
 
 
 class CellValue:
@@ -141,21 +149,7 @@ class ExcelCell:
 
         col_alias = ''
         row_alias = ''
-
-        aliases_mask = ''
-        char_type = ''
         for char in self._cell_name:
-            if char.isalpha():
-                char_type = 'c'
-            elif char.isdigit():
-                char_type = 'd'
-
-            if aliases_mask:
-                if aliases_mask[-1] != char_type:
-                    aliases_mask += char_type
-            else:
-                aliases_mask += char_type
-
             if char.isalpha():
                 col_alias += char
             elif char.isdigit():
@@ -163,7 +157,8 @@ class ExcelCell:
             else:
                 raise Exception(f'Wrong char in ExcelCellPosition: "{char}"')
 
-        if aliases_mask != 'cd':
+        aliases_mask = self.get_aliases_mask(some_text=self._cell_name)
+        if aliases_mask != IndexesMask.CharDigit:
             raise Exception(f'Wrong excel cell name format: "{cell_name}"')
 
         try:
@@ -172,12 +167,13 @@ class ExcelCell:
             raise Exception(f'Wrong column name in ExcelCellPosition: "{col_alias}"')
 
         try:
+            # Мало ли, лучше на всякий случай int() обернуть в try
             row = int(row_alias)
         except Exception:
-            raise Exception(f'Wrong row number in ExcelCellPosition: "{col_alias}"')
+            raise Exception(f'Wrong row number in ExcelCellPosition: "{row_alias}"')
         else:
             if row > ExcelConstants.MAX_EXCEL_ROWS_COUNT:
-                raise Exception(f'Wrong row number in ExcelCellPosition: "{col_alias}"')
+                raise Exception(f'Wrong row number in ExcelCellPosition: "{row_alias}"')
 
         row -= 1
         self._cell_position = CellPosition(col=col, row=row)
@@ -189,6 +185,43 @@ class ExcelCell:
     @property
     def cell_position(self) -> CellPosition:
         return self._cell_position
+
+    @staticmethod
+    def get_aliases_mask(some_text: str) -> IndexesMask:
+        """
+        Возвращает краткое без дубликатов представление текстового аргумента
+        :param some_text: или адрес одной ячейки или диапазон индексов (номера строк или названйи колонок)
+        :return: маска индексов
+        """
+        aliases_mask = ''
+        char_type = ''
+        for char in some_text:
+            if not char.isalpha() and not char.isdigit():
+                aliases_mask = 'w'
+                break
+
+            if char.isalpha():
+                char_type = 'c'
+            elif char.isdigit():
+                char_type = 'd'
+
+            if aliases_mask:
+                if aliases_mask[-1] != char_type:
+                    aliases_mask += char_type
+            else:
+                aliases_mask += char_type
+
+        if aliases_mask == 'c':
+            res = IndexesMask.OnlyChar
+        elif aliases_mask == 'd':
+            res = IndexesMask.OnlyDigit
+        elif aliases_mask == 'cd':
+            res = IndexesMask.CharDigit
+        elif aliases_mask == 'dc':
+            res = IndexesMask.DigitChar
+        else:
+            res = IndexesMask.Wrong
+        return res
 
     def __lt__(self, other):
         return self.cell_position < other.cell_position
@@ -347,133 +380,6 @@ class NeighborCell:
         return f'NeighborCell(df, {self._cell_value.__repr__()}, {self._cell_offset.__repr__()})'
 
 
-class ExactValueFinder(ValueFinderAbstract):
-    condition_type = 'exact_cell_value'
-
-    def __init__(self, cell_value: CellValue):
-        self._cell_value = cell_value
-        super().__init__()
-
-    def get_all_indexes(self, axis: int) -> np.array:
-        if self._cell_value:
-            # cell_value не пустое значение
-            if self.df is not None:
-                seria = self.df[self.df.eq(self._cell_value.value)].notna().any(axis=axis)
-            else:
-                seria = self.sr.eq(self._cell_value.value)
-        else:
-            # exact_cell_value пустое значение.
-            # Пустым значением могут быть варианты: '', None, np.NaN.
-            # С None и np.NaN функция .isnull() справится, т.е. поставит True в нужную позицию.
-            # А вот с '' не справится и поставит False. Потому предварительно '' необходимо заменить на None.
-            if self.df is not None:
-                seria = self.df.replace(to_replace={'': None}).isnull().any(axis=axis)
-            else:
-                seria = self.sr.replace(to_replace={'': None}).isnull()
-
-        res = seria[seria].index.values
-        return res
-
-
-class ExactValuesFinder(ValueFinderAbstract):
-    condition_type = 'exact_cell_values'
-
-    def __init__(self, cell_values: List[CellValue]):
-        self._cell_values = cell_values
-        super().__init__()
-
-    def get_all_indexes(self, axis: int) -> np.array:
-        values = list(set([cell_value.value for cell_value in self._cell_values]))
-        values_wo_nulls = [value for value in values if not pd.isnull(value)]
-        empty_value_exists = any(pd.isnull(values))
-        seria_nulls = None
-        seria_wo_nulls = None
-        if empty_value_exists:
-            # В списке есть пустое значение, значит предстоит проверка на пустое значение. Значит необходимо
-            # '' заменить на None в df
-            if self.df is not None:
-                seria_nulls = self.df.replace(to_replace={'': None}).isnull().any(axis=axis)
-            else:
-                seria_nulls = self.sr.replace(to_replace={'': None}).isnull()
-
-        if len(values_wo_nulls):
-            # В списке есть реальные значения
-            if self.df is not None:
-                seria_wo_nulls = self.df[self.df.isin(values_wo_nulls)].notna().any(axis=axis)
-            else:
-                seria_wo_nulls = self.sr.isin(values_wo_nulls)
-
-        if seria_nulls is not None and seria_wo_nulls is not None:
-            seria = seria_nulls + seria_wo_nulls
-        elif seria_nulls is not None and seria_wo_nulls is None:
-            seria = seria_nulls
-        else:
-            seria = seria_wo_nulls
-        res = seria[seria].index.values
-        return res
-
-
-class RegexFinder(ValueFinderAbstract):
-    """
-    Only for string columns
-    """
-    condition_type = 'regex'
-
-    def __init__(self, cell_value: CellValue):
-        self._cell_value = cell_value
-        super().__init__()
-
-    def get_all_indexes(self, axis: int) -> np.array:
-        pattern = self._cell_value.value
-        if self.df is not None:
-            seria = self.df. \
-                apply(lambda s: s.astype(str).str.match(pattern, na=False) if is_string_dtype(s) else False). \
-                any(axis=axis)
-        else:
-            # Т.к. это regex, то необходимо обязательно конвертировать в строку
-            seria = self.sr.astype(str).str.match(pattern, na=False)
-        res = seria[seria].index.values
-        return res
-
-
-class StartWithFinder(ValueFinderAbstract):
-    condition_type = 'start_with'
-
-    def __init__(self, cell_value: CellValue):
-        self._cell_value = cell_value
-        super().__init__()
-
-    def get_all_indexes(self, axis: int) -> np.array:
-        value = self._cell_value.value
-        if self.df is not None:
-            seria = self.df. \
-                apply(lambda s: s.astype(str).str.startswith(value, na=False) if is_string_dtype(s) else False). \
-                any(axis=axis)
-        else:
-            seria = self.sr.str.startswith(value, na=False)
-        res = seria[seria].index.values
-        return res
-
-
-class EndWithFinder(ValueFinderAbstract):
-    condition_type = 'end_with'
-
-    def __init__(self, cell_value: CellValue):
-        self._cell_value = cell_value
-        super().__init__()
-
-    def get_all_indexes(self, axis: int) -> np.array:
-        value = self._cell_value.value
-        if self.df is not None:
-            seria = self.df. \
-                apply(lambda s: s.astype(str).str.endswith(value, na=False) if is_string_dtype(s) else False). \
-                any(axis=axis)
-        else:
-            seria = self.sr.str.endswith(value, na=False)
-        res = seria[seria].index.values
-        return res
-
-
 class NeighborsContainer:
     def __init__(self, neighbors: [List[NeighborCell], NeighborCell]):
         if isinstance(neighbors, list):
@@ -492,36 +398,41 @@ class NeighborsContainer:
         return res
 
 
-class ConditionContainer:
+class Indexes:
     """
-    Содержит искателя ячейки и разный набор действий (смещения или поиск соседа).
+    Принимает на вход строку, в которой будут разного рода перечислени: и одиночные и диапазонные.
+    Проверяет, приводит к отсортированному виду и раворачивает диапазоны.
+    Обрабатывает как диапазоны строк так и столбцов.
+    Может принимать или числа (для строк) или буквенные коды столбцов (для столбцов)
     """
-    MAX_ACTIONS_COUNT = 10
+    MAX_LENGTH = 100
+    SIMPLE_DELIMITERS = [',', '']
+    DIAPASON_DELIMITERS = ['-', ':']
 
-    def __init__(self):
-        self._actions = []
-        self._cell_finder = None
+    def __init__(self, indexes: str):
+        self._indexes = indexes
+        reason = self._is_correct()
+        if reason:
+            raise Exception(reason)
 
-    @property
-    def cell_finder(self):
-        if self._cell_finder is None:
-            raise Exception('Cell finder is empty')
-        return self._cell_finder
+    def _is_correct(self) -> str:
+        msg = ''
+        # Проверка на длину
+        wo_spaces = self._indexes.replace(' ', '')
+        if len(wo_spaces) > self.MAX_LENGTH:
+            return f'The string is too long. Limit is {self.MAX_LENGTH} symbols without spaces'
 
-    @cell_finder.setter
-    def cell_finder(self, cell_finder):
-        self._cell_finder = cell_finder
+        # Проверка на однородность: или числа или строки
+        wo_delimiters = wo_spaces
+        for delimiter in self.SIMPLE_DELIMITERS + self.DIAPASON_DELIMITERS:
+            wo_delimiters = wo_delimiters.replace(delimiter, '')
+        aliases_mask = ExcelCell.get_aliases_mask(some_text=wo_delimiters)
+        if aliases_mask not in [IndexesMask.OnlyChar, IndexesMask.OnlyDigit]:
+            return f'Indexes must contains only numbers or symbols'
 
-    @property
-    def actions(self):
-        return self._actions
 
-    def add_action(self, action):
-        """
-        Добавляет действие
-        :param action: действие (смещение или сосед)
-        """
-        if len(self._actions) >= self.MAX_ACTIONS_COUNT:
-            raise Exception(f'The action limit has reached {self.MAX_ACTIONS_COUNT}')
-        self._actions.append(action)
+        # Открытый диапазон слева справа
+        # Правильность диапазона: левая граница меньше чем правая
+        # Попадание в границы
 
+        return msg
