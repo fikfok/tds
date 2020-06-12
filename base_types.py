@@ -400,13 +400,13 @@ class NeighborsContainer:
 
 class Indexes:
     """
-    Принимает на вход строку, в которой будут разного рода перечислени: и одиночные и диапазонные.
+    Принимает на вход строку, в которой будут разного рода перечисления: и одиночные и диапазонные.
     Проверяет, приводит к отсортированному виду и раворачивает диапазоны.
     Обрабатывает как диапазоны строк так и столбцов.
     Может принимать или числа (для строк) или буквенные коды столбцов (для столбцов)
     """
     MAX_LENGTH = 100
-    SIMPLE_DELIMITERS = [',', '']
+    SIMPLE_DELIMITERS = [',', ' ']
     DIAPASON_DELIMITERS = ['-', ':']
 
     def __init__(self, indexes: str):
@@ -417,22 +417,96 @@ class Indexes:
 
     def _is_correct(self) -> str:
         msg = ''
-        # Проверка на длину
-        wo_spaces = self._indexes.replace(' ', '')
-        if len(wo_spaces) > self.MAX_LENGTH:
-            return f'The string is too long. Limit is {self.MAX_LENGTH} symbols without spaces'
+        checkers = [
+            self._check_length,
+            self._check_homogeneous,
+            self._check_open_range,
+            self._check_range_borders,
 
-        # Проверка на однородность: или числа или строки
-        wo_delimiters = wo_spaces
+            # Попадание в границы
+
+        ]
+        for checker in checkers:
+            msg = checker()
+            if msg:
+                break
+        return msg
+
+    def _get_indexes_with_space_delimeters(self) -> str:
+        """
+        Заменить все разделители на пробелы, все пробелы заменить на одиночные, убрать пробел сбоков
+        """
+        # Сначала необходимо сбоков убрать пробелы и символы разделителей
+        indexes = self._indexes.strip()
+        for delimiter in self.SIMPLE_DELIMITERS:
+            indexes = indexes.strip(delimiter)
+            # Заменить все разделители внутри на пробелы
+            indexes = indexes.replace(delimiter, ' ')
+        # В итоге в строке разделители заменены на пробелы и с боков нет пробелов и разделителей
+        # Теперь надо повторяющиеся пробелы заменить на одиночные
+        indexes = ' '.join(indexes.split())
+        return indexes
+
+    def _get_aliases_mask(self) -> IndexesMask:
+        """
+        Вернуть маску алиасов
+        """
+        wo_delimiters = self._indexes.replace(' ', '')
         for delimiter in self.SIMPLE_DELIMITERS + self.DIAPASON_DELIMITERS:
             wo_delimiters = wo_delimiters.replace(delimiter, '')
         aliases_mask = ExcelCell.get_aliases_mask(some_text=wo_delimiters)
+        return aliases_mask
+
+    def _check_length(self) -> str:
+        """
+        Проверка на длину
+        """
+        msg = ''
+        wo_spaces = self._indexes.replace(' ', '')
+        if len(wo_spaces) > self.MAX_LENGTH:
+            msg = f'The string is too long. Limit is {self.MAX_LENGTH} symbols without spaces'
+        return msg
+
+    def _check_homogeneous(self) -> str:
+        """
+        Проверка на однородность: или числа или строки
+        """
+        msg = ''
+        aliases_mask = self._get_aliases_mask()
         if aliases_mask not in [IndexesMask.OnlyChar, IndexesMask.OnlyDigit]:
-            return f'Indexes must contains only numbers or symbols'
+            msg = 'Indexes must be only number or symbol'
+        return msg
 
+    def _check_open_range(self) -> str:
+        """
+        Отлов открытого диапазона слева или справа
+        """
+        msg = ''
+        ideal_indexes = self._get_indexes_with_space_delimeters()
+        ideal_indexes = ideal_indexes.split()
+        for index in ideal_indexes:
+            if index[1] in self.DIAPASON_DELIMITERS or index[-1] in self.DIAPASON_DELIMITERS:
+                msg = f'Wrong index {index}'
+        return msg
 
-        # Открытый диапазон слева справа
-        # Правильность диапазона: левая граница меньше чем правая
-        # Попадание в границы
-
+    def _check_range_borders(self) -> str:
+        """
+        Правильность диапазона: левая граница меньше чем правая
+        """
+        msg = ''
+        aliases_mask = self._get_aliases_mask()
+        ideal_indexes = self._get_indexes_with_space_delimeters()
+        ideal_indexes = ideal_indexes.split()
+        for index in ideal_indexes:
+            for delimiter in self.DIAPASON_DELIMITERS:
+                if delimiter in index:
+                    left_index, right_index = index.split(delimiter)
+                    if aliases_mask == IndexesMask.OnlyChar:
+                        left_col_num = ExcelConstants.ALL_COLUMNS_LABELS.index(left_index)
+                        rigth_col_num = ExcelConstants.ALL_COLUMNS_LABELS.index(right_index)
+                        if left_col_num > rigth_col_num:
+                            msg = f'Wrong borders of range: {index}'
+                    else:
+                        if left_index > right_index:
+                            msg = f'Wrong borders of range: {index}'
         return msg
