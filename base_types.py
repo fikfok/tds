@@ -416,15 +416,16 @@ class Indexes:
             raise Exception(reason)
 
     def _is_correct(self) -> str:
+        """
+        Проверка на корректность всех перечисленных индексов
+        """
         msg = ''
         checkers = [
             self._check_length,
             self._check_homogeneous,
             self._check_open_range,
             self._check_range_borders,
-
-            # Попадание в границы
-
+            self._check_in_scope,
         ]
         for checker in checkers:
             msg = checker()
@@ -434,7 +435,7 @@ class Indexes:
 
     def _get_indexes_with_space_delimeters(self) -> str:
         """
-        Заменить все разделители на пробелы, все пробелы заменить на одиночные, убрать пробел сбоков
+        Заменить все разделители на пробелы, все пробелы заменить на одиночные, убрать пробелы сбоков
         """
         # Сначала необходимо сбоков убрать пробелы и символы разделителей
         indexes = self._indexes.strip()
@@ -485,7 +486,7 @@ class Indexes:
         ideal_indexes = self._get_indexes_with_space_delimeters()
         ideal_indexes = ideal_indexes.split()
         for index in ideal_indexes:
-            if index[1] in self.DIAPASON_DELIMITERS or index[-1] in self.DIAPASON_DELIMITERS:
+            if index[0] in self.DIAPASON_DELIMITERS or index[-1] in self.DIAPASON_DELIMITERS:
                 msg = f'Wrong index {index}'
         return msg
 
@@ -505,8 +506,51 @@ class Indexes:
                         left_col_num = ExcelConstants.ALL_COLUMNS_LABELS.index(left_index)
                         rigth_col_num = ExcelConstants.ALL_COLUMNS_LABELS.index(right_index)
                         if left_col_num > rigth_col_num:
-                            msg = f'Wrong borders of range: {index}'
+                            return f'Wrong borders of range: {index}'
                     else:
-                        if left_index > right_index:
-                            msg = f'Wrong borders of range: {index}'
+                        if int(left_index) > int(right_index):
+                            return f'Wrong borders of range: {index}'
         return msg
+
+    def _check_in_scope(self) -> str:
+        """
+        Проверка а вхождение всех индексов в диапазон разрешённых индексов
+        """
+        msg = ''
+        aliases_mask = self._get_aliases_mask()
+        ideal_indexes = self._get_indexes_with_space_delimeters()
+        ideal_indexes = ideal_indexes.split()
+        for index in ideal_indexes:
+            for delimiter in self.DIAPASON_DELIMITERS:
+                if delimiter in index:
+                    left_index, right_index = index.split(delimiter)
+                    if aliases_mask == IndexesMask.OnlyChar:
+                        if left_index not in ExcelConstants.ALL_COLUMNS_LABELS:
+                            return f'{left_index} not in columns scope'
+                        if right_index not in ExcelConstants.ALL_COLUMNS_LABELS:
+                            return f'{right_index} not in columns scope'
+                    else:
+                        if not (0 <= int(left_index) <= ExcelConstants.MAX_EXCEL_ROWS_COUNT):
+                            return f'{left_index} not in rows scope'
+                        if not (0 <= int(right_index) <= ExcelConstants.MAX_EXCEL_ROWS_COUNT):
+                            return f'{right_index} not in rows scope'
+                else:
+                    if aliases_mask == IndexesMask.OnlyChar:
+                        if index not in ExcelConstants.ALL_COLUMNS_LABELS:
+                            return f'{index} not in columns scope'
+                    else:
+                        if not (0 <= int(index) <= ExcelConstants.MAX_EXCEL_ROWS_COUNT):
+                            return f'{index} not in rows scope'
+        return msg
+
+    def _unpack_diapasones(self) -> list:
+        """
+        Распаковывает диапазоны. Возвращает список, в котором все индексы: и одиночные и распакованные диапазоны.
+        Без сортировок и удалений дубликатов.
+        """
+        aliases_mask = self._get_aliases_mask()
+        ideal_indexes = self._get_indexes_with_space_delimeters()
+        ideal_indexes = ideal_indexes.split()
+        for index in ideal_indexes:
+            for delimiter in self.DIAPASON_DELIMITERS:
+                if delimiter in index:
