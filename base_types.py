@@ -1,5 +1,6 @@
 import itertools
 from abc import ABC, abstractmethod
+from copy import copy
 from enum import Enum
 from typing import List
 
@@ -406,11 +407,16 @@ class Indexes:
     Может принимать или числа (для строк) или буквенные коды столбцов (для столбцов)
     """
     MAX_LENGTH = 100
-    SIMPLE_DELIMITERS = [',', ' ']
+    # Разделители между индексами
+    SIMPLE_DELIMITERS = [',', ' ', ';']
+    # Разделители между индексами в диапазоне
     DIAPASON_DELIMITERS = ['-', ':']
 
     def __init__(self, indexes: str):
-        self._indexes = indexes
+        self._indexes = indexes.upper()
+        # TODO Пока не уверен тут или в другом месте проверять на корректность.
+        # Если тут, то тогда инстанцирование надо оборачивать в try...except, что КМК не очень хорошо
+        # Лучше сделать отдельным статическим методом
         reason = self._is_correct()
         if reason:
             raise Exception(reason)
@@ -433,20 +439,33 @@ class Indexes:
                 break
         return msg
 
-    def _get_indexes_with_space_delimeters(self) -> str:
+    def _replace_delim_to_space(self, indexes: str, delimeters: list) -> str:
         """
         Заменить все разделители на пробелы, все пробелы заменить на одиночные, убрать пробелы сбоков
         """
         # Сначала необходимо сбоков убрать пробелы и символы разделителей
-        indexes = self._indexes.strip()
-        for delimiter in self.SIMPLE_DELIMITERS:
-            indexes = indexes.strip(delimiter)
+        _indexes = copy(indexes)
+        for delimiter in delimeters:
+            _indexes = _indexes.strip(delimiter)
             # Заменить все разделители внутри на пробелы
-            indexes = indexes.replace(delimiter, ' ')
+            _indexes = _indexes.replace(delimiter, ' ')
         # В итоге в строке разделители заменены на пробелы и с боков нет пробелов и разделителей
         # Теперь надо повторяющиеся пробелы заменить на одиночные
-        indexes = ' '.join(indexes.split())
-        return indexes
+        _indexes = ' '.join(_indexes.split())
+        return _indexes
+
+    def _replace_spaces_around_diap_delim(self, indexes: str) -> str:
+        _indexes = copy(indexes)
+        main_diap_delime = self.DIAPASON_DELIMITERS[0]
+        # Заменить все разделители диапазонов на один - DIAPASON_DELIMITERS[0]
+        for diap_delim in self.DIAPASON_DELIMITERS:
+            _indexes = _indexes.replace(diap_delim, main_diap_delime)
+
+        # Убрать повторяющиеся разделители диапазонов
+        _indexes = main_diap_delime.join(_indexes.split(main_diap_delime))
+        # Убрать пробелы с обеих сторон от разделителя диапазона
+        _indexes = main_diap_delime.join([_index.strip() for _index in _indexes.split(main_diap_delime)])
+        return _indexes
 
     def _get_aliases_mask(self) -> IndexesMask:
         """
@@ -483,9 +502,10 @@ class Indexes:
         Отлов открытого диапазона слева или справа
         """
         msg = ''
-        ideal_indexes = self._get_indexes_with_space_delimeters()
-        ideal_indexes = ideal_indexes.split()
-        for index in ideal_indexes:
+        indexes_wo_simpl_delim = self._replace_delim_to_space(indexes=self._indexes, delimeters=self.SIMPLE_DELIMITERS)
+        indexes_wo_simpl_delim = self._replace_spaces_around_diap_delim(indexes=indexes_wo_simpl_delim)
+        indexes_wo_simpl_delim = indexes_wo_simpl_delim.split()
+        for index in indexes_wo_simpl_delim:
             if index[0] in self.DIAPASON_DELIMITERS or index[-1] in self.DIAPASON_DELIMITERS:
                 msg = f'Wrong index {index}'
         return msg
@@ -496,20 +516,21 @@ class Indexes:
         """
         msg = ''
         aliases_mask = self._get_aliases_mask()
-        ideal_indexes = self._get_indexes_with_space_delimeters()
-        ideal_indexes = ideal_indexes.split()
-        for index in ideal_indexes:
-            for delimiter in self.DIAPASON_DELIMITERS:
-                if delimiter in index:
-                    left_index, right_index = index.split(delimiter)
-                    if aliases_mask == IndexesMask.OnlyChar:
-                        left_col_num = ExcelConstants.ALL_COLUMNS_LABELS.index(left_index)
-                        rigth_col_num = ExcelConstants.ALL_COLUMNS_LABELS.index(right_index)
-                        if left_col_num > rigth_col_num:
-                            return f'Wrong borders of range: {index}'
-                    else:
-                        if int(left_index) > int(right_index):
-                            return f'Wrong borders of range: {index}'
+        indexes_wo_simpl_delim = self._replace_delim_to_space(indexes=self._indexes, delimeters=self.SIMPLE_DELIMITERS)
+        indexes_wo_simpl_delim = self._replace_spaces_around_diap_delim(indexes=indexes_wo_simpl_delim)
+        indexes_wo_simpl_delim = indexes_wo_simpl_delim.split()
+        for index in indexes_wo_simpl_delim:
+            index_wo_diap_delim = self._replace_delim_to_space(indexes=index, delimeters=self.DIAPASON_DELIMITERS)
+            if ' ' in index_wo_diap_delim:
+                left_index, right_index = index_wo_diap_delim.split()
+                if aliases_mask == IndexesMask.OnlyChar:
+                    left_col_num = ExcelConstants.ALL_COLUMNS_LABELS.index(left_index)
+                    rigth_col_num = ExcelConstants.ALL_COLUMNS_LABELS.index(right_index)
+                    if left_col_num > rigth_col_num:
+                        return f'Wrong borders of range: {index_wo_diap_delim}'
+                else:
+                    if int(left_index) > int(right_index):
+                        return f'Wrong borders of range: {index_wo_diap_delim}'
         return msg
 
     def _check_in_scope(self) -> str:
@@ -518,39 +539,55 @@ class Indexes:
         """
         msg = ''
         aliases_mask = self._get_aliases_mask()
-        ideal_indexes = self._get_indexes_with_space_delimeters()
-        ideal_indexes = ideal_indexes.split()
-        for index in ideal_indexes:
-            for delimiter in self.DIAPASON_DELIMITERS:
-                if delimiter in index:
-                    left_index, right_index = index.split(delimiter)
-                    if aliases_mask == IndexesMask.OnlyChar:
-                        if left_index not in ExcelConstants.ALL_COLUMNS_LABELS:
-                            return f'{left_index} not in columns scope'
-                        if right_index not in ExcelConstants.ALL_COLUMNS_LABELS:
-                            return f'{right_index} not in columns scope'
-                    else:
-                        if not (0 <= int(left_index) <= ExcelConstants.MAX_EXCEL_ROWS_COUNT):
-                            return f'{left_index} not in rows scope'
-                        if not (0 <= int(right_index) <= ExcelConstants.MAX_EXCEL_ROWS_COUNT):
-                            return f'{right_index} not in rows scope'
+        indexes_wo_simpl_delim = self._replace_delim_to_space(indexes=self._indexes, delimeters=self.SIMPLE_DELIMITERS)
+        indexes_wo_simpl_delim = self._replace_spaces_around_diap_delim(indexes=indexes_wo_simpl_delim)
+        indexes_wo_simpl_delim = indexes_wo_simpl_delim.split()
+        for index in indexes_wo_simpl_delim:
+            index_wo_diap_delim = self._replace_delim_to_space(indexes=index, delimeters=self.DIAPASON_DELIMITERS)
+            if ' ' in index_wo_diap_delim:
+                left_index, right_index = index_wo_diap_delim.split()
+                if aliases_mask == IndexesMask.OnlyChar:
+                    if left_index not in ExcelConstants.ALL_COLUMNS_LABELS:
+                        return f'{left_index} not in columns scope'
+                    if right_index not in ExcelConstants.ALL_COLUMNS_LABELS:
+                        return f'{right_index} not in columns scope'
                 else:
-                    if aliases_mask == IndexesMask.OnlyChar:
-                        if index not in ExcelConstants.ALL_COLUMNS_LABELS:
-                            return f'{index} not in columns scope'
-                    else:
-                        if not (0 <= int(index) <= ExcelConstants.MAX_EXCEL_ROWS_COUNT):
-                            return f'{index} not in rows scope'
+                    if not (0 <= int(left_index) <= ExcelConstants.MAX_EXCEL_ROWS_COUNT):
+                        return f'{left_index} not in rows scope'
+                    if not (0 <= int(right_index) <= ExcelConstants.MAX_EXCEL_ROWS_COUNT):
+                        return f'{right_index} not in rows scope'
+            else:
+                if aliases_mask == IndexesMask.OnlyChar:
+                    if index_wo_diap_delim not in ExcelConstants.ALL_COLUMNS_LABELS:
+                        return f'{index_wo_diap_delim} not in columns scope'
+                else:
+                    if not (0 <= int(index_wo_diap_delim) <= ExcelConstants.MAX_EXCEL_ROWS_COUNT):
+                        return f'{index_wo_diap_delim} not in rows scope'
         return msg
 
-    def _unpack_diapasones(self) -> list:
+    def get_all_indexes(self) -> list:
         """
         Распаковывает диапазоны. Возвращает список, в котором все индексы: и одиночные и распакованные диапазоны.
         Без сортировок и удалений дубликатов.
         """
+        all_indexes = []
         aliases_mask = self._get_aliases_mask()
-        ideal_indexes = self._get_indexes_with_space_delimeters()
-        ideal_indexes = ideal_indexes.split()
-        for index in ideal_indexes:
-            for delimiter in self.DIAPASON_DELIMITERS:
-                if delimiter in index:
+        indexes_wo_simpl_delim = self._replace_delim_to_space(indexes=self._indexes, delimeters=self.SIMPLE_DELIMITERS)
+        indexes_wo_simpl_delim = self._replace_spaces_around_diap_delim(indexes=indexes_wo_simpl_delim)
+        indexes_wo_simpl_delim = indexes_wo_simpl_delim.split()
+        for index in indexes_wo_simpl_delim:
+            index_wo_diap_delim = self._replace_delim_to_space(indexes=index, delimeters=self.DIAPASON_DELIMITERS)
+            if ' ' in index_wo_diap_delim:
+                left_index, right_index = index_wo_diap_delim.split()
+                if aliases_mask == IndexesMask.OnlyChar:
+                    left_col_num = ExcelConstants.ALL_COLUMNS_LABELS.index(left_index)
+                    rigth_col_num = ExcelConstants.ALL_COLUMNS_LABELS.index(right_index)
+                    all_indexes += ExcelConstants.ALL_COLUMNS_LABELS[left_col_num:rigth_col_num + 1]
+                else:
+                    all_indexes += list(range(int(left_index), int(right_index) + 1))
+            else:
+                if aliases_mask == IndexesMask.OnlyChar:
+                    all_indexes.append(index_wo_diap_delim)
+                else:
+                    all_indexes.append(int(index_wo_diap_delim))
+        return all_indexes
