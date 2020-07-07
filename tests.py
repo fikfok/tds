@@ -672,8 +672,16 @@ class TestTDS(unittest.TestCase):
 
     def test_indexes(self):
         indexes_results = [
+            ('a,', ['A']),
+            ('a;', ['A']),
+            (';a;', ['A']),
+            (';a', ['A']),
+            (',a', ['A']),
+            (',a,', ['A']),
             ('a b C', ['A', 'B', 'C']),
             ('a B-e', ['A', 'B', 'C', 'D', 'E']),
+            ('a B:    -e', ['A', 'B', 'C', 'D', 'E']),
+            ('a B-   :e', ['A', 'B', 'C', 'D', 'E']),
             ('B:e a', ['B', 'C', 'D', 'E', 'A']),
             ('b:E ,, a', ['B', 'C', 'D', 'E', 'A']),
             ('b-:E ,; A', ['B', 'C', 'D', 'E', 'A']),
@@ -682,19 +690,88 @@ class TestTDS(unittest.TestCase):
             ('b-E A:c', ['B', 'C', 'D', 'E', 'A', 'B', 'C']),
             ('T b-E A:c T', ['T', 'B', 'C', 'D', 'E', 'A', 'B', 'C', 'T']),
             (' r,,, X  ----:-  -  Z t ;;; o', ['R', 'X', 'Y', 'Z', 'T', 'O']),
+            ('a a a a a', ['A', 'A', 'A', 'A', 'A']),
 
             ('1 2 3', [1, 2, 3]),
+            ('1;2,3', [1, 2, 3]),
+            ('1;,;2,,3', [1, 2, 3]),
             ('1  -    3', [1, 2, 3]),
             ('1  -    3 6', [1, 2, 3, 6]),
+            ('1-    3 6', [1, 2, 3, 6]),
+            ('1   -3 6', [1, 2, 3, 6]),
             (' , 1  -    3 6 , ', [1, 2, 3, 6]),
             (' , 1  -:    3 6 ; ', [1, 2, 3, 6]),
             (' ,,, 1  ----:-  -  3 6 ;;; ', [1, 2, 3, 6]),
             (' 7,,, 1  ----:-  -  3 6 ;;; 9', [7, 1, 2, 3, 6, 9]),
-
+            ('1 1 1 1 1', [1, 1, 1, 1, 1]),
         ]
         for value, result in indexes_results:
-            indexes = Indexes(value)
+            try:
+                indexes = Indexes(value)
+            except:
+                print(value, result)
             self.assertEqual(indexes.get_all_indexes(), result)
+
+        bad_indexes = [
+            'a b C, 1,2,3',
+            'a b ,-F',
+            'a b ;-F',
+            'a b ,:F',
+            'a b ;:F',
+            'a b F-',
+            'a b F-,',
+            'a b F-;',
+            'a b F-,G',
+            'a b F,-G',
+            'a b F:',
+            'a b F:,',
+            'a b F:;',
+            'a b F:,G',
+            'a b F,:G',
+            'a b F:',
+            'a b :F',
+            ':',
+            '-',
+            ';',
+            ' ',
+            ',',
+            ' : ',
+            ' - ',
+            ' ; ',
+            '    ',
+            ' , ',
+            '1, 2, 2:f'
+            '1, 2, 2-f'
+            '1 2 ,-7',
+            '1 2 ;-7',
+            '1 2 ,:7',
+            '1 2 ;:7',
+            '1 2 7-',
+            '1 2 7-,',
+            '1 2 7-;',
+            '1 2 7-,9',
+            '1 2 7,-9',
+            '1 2 7:',
+            '1 2 7:,',
+            '1 2 7:;',
+            '1 2 7:,9',
+            '1 2 7,:9',
+            '1 2 7:',
+            '1 2 :7',
+
+            '4-1',
+            'G-a',
+            '1 111111111111',
+            'a aaaaaaaaaaaa',
+            'a ' * 200,
+            '1 ' * 200,
+
+        ]
+        for value in bad_indexes:
+            try:
+                self.assertRaises(Exception, Indexes, indexes=value)
+            except:
+                print(value)
 
     def _check_results(self, expected_result: list, finder_result: list):
         self.assertEqual(len(expected_result), len(finder_result))

@@ -502,9 +502,12 @@ class Indexes:
         Отлов открытого диапазона слева или справа
         """
         msg = ''
-        indexes_wo_simpl_delim = self._replace_delim_to_space(indexes=self._indexes, delimeters=self.SIMPLE_DELIMITERS)
-        indexes_wo_simpl_delim = self._replace_spaces_around_diap_delim(indexes=indexes_wo_simpl_delim)
+        indexes_wo_simpl_delim = self._replace_spaces_around_diap_delim(indexes=self._indexes)
         indexes_wo_simpl_delim = indexes_wo_simpl_delim.split()
+        indexes_wo_simpl_delim = [
+            self._replace_delim_to_space(indexes=ind, delimeters=self.SIMPLE_DELIMITERS)
+            for ind in indexes_wo_simpl_delim
+        ]
         for index in indexes_wo_simpl_delim:
             if index[0] in self.DIAPASON_DELIMITERS or index[-1] in self.DIAPASON_DELIMITERS:
                 msg = f'Wrong index {index}'
